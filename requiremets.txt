@@ -1,0 +1,7 @@
+streamlit
+pytesseract
+Pillow
+huggingface_hub
+fpdf
+pdf2image
+python-dotenv
