@@ -54,7 +54,8 @@ if st.button("Extract Structured Data"):
         st.error("No OCR text found. Please upload a document first.")
     else:
         with st.spinner("Calling Mistral..."):
-            # Build a single text prompt for text_generation
+
+            # Build a single prompt for the conversational task
             prompt = (
                 "You are Mistral OCR 2503, an AI assistant that extracts structured fields "
                 "from scanned document text.\n\n"
@@ -66,19 +67,24 @@ if st.button("Extract Structured Data"):
             )
 
             try:
-                raw_output = client.text_generation(
-                    prompt=prompt,
-                    model=MODEL_NAME,   # omit this if you bound model in the client
+                # Use the provider's supported task: conversational
+                convo_output = client.conversational(
+                    prompt,
+                    model=MODEL_NAME,
                     max_new_tokens=512,
                     temperature=0.15,
                 )
 
-                output_json = raw_output.strip()
+                # HuggingFace 'conversational' returns a dict with 'generated_text'
+                output_json = convo_output.get("generated_text", "").strip()
 
-                # Optional: clean up if model sneaks in ```json ``` fences
+                # Optional: clean up if the model sneaks in ```json fences
                 if output_json.startswith("```"):
+                    # strip backticks
                     output_json = output_json.strip("`")
-                    output_json = output_json.replace("json", "", 1).strip()
+                    # remove an initial 'json' tag if present
+                    if output_json.lower().startswith("json"):
+                        output_json = output_json[4:].strip()
 
                 try:
                     result = json.loads(output_json)
@@ -90,7 +96,7 @@ if st.button("Extract Structured Data"):
                     pdf.add_page()
                     pdf.set_font("Arial", size=12)
                     for k, v in result.items():
-                        # Simple wrapping to avoid text going off the page
+                        # multi_cell avoids text going off the page
                         pdf.multi_cell(0, 10, txt=f"{k}: {v}")
                     pdf.output("output.pdf")
 
@@ -103,4 +109,5 @@ if st.button("Extract Structured Data"):
 
             except Exception as e:
                 st.error(f"Error calling Mistral: {str(e)}")
+
 
