@@ -2,7 +2,7 @@ import streamlit as st
 from PIL import Image
 from pdf2image import convert_from_bytes
 import pytesseract
-from huggingface_hub import InferenceClient
+from openai import OpenAI
 from fpdf import FPDF
 import json
 import os
@@ -10,13 +10,23 @@ from dotenv import load_dotenv
 
 # Load env variables
 load_dotenv()
-API_KEY = os.getenv("HF_API_KEY")
+
+# Prefer Streamlit Secrets in the cloud, fall back to env locally
+API_KEY = st.secrets.get("HF_API_KEY", None) if hasattr(st, "secrets") else None
 if not API_KEY:
-    raise ValueError("Missing HF_API_KEY. Please set it in .env or as an environment variable.")
+    API_KEY = os.getenv("HF_API_KEY")
 
-MODEL_NAME = "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+if not API_KEY:
+    raise ValueError("Missing HF_API_KEY. Set it in Streamlit Secrets or as an environment variable.")
 
-client = InferenceClient(api_key=API_KEY)
+# Use a router-supported chat model
+MODEL_NAME = "google/gemma-2-2b-it"
+
+# OpenAI client pointed at Hugging Face router
+client = OpenAI(
+    base_url="https://router.huggingface.co/v1",
+    api_key=API_KEY,
+)
 
 st.set_page_config(page_title="PaperSleuth", layout="centered")
 st.title("PaperSleuth")
