@@ -49,31 +49,36 @@ if uploaded_file:
     st.subheader("OCR Text")
     st.text_area("Extracted Text", ocr_text, height=200)
 
-    if st.button("Extract Structured Data"):
+if st.button("Extract Structured Data"):
+    if not ocr_text.strip():
+        st.error("No OCR text found. Please upload a document first.")
+    else:
         with st.spinner("Calling Mistral..."):
-
-            messages = [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are Mistral OCR 2503, an AI assistant that extracts structured fields "
-                        "from scanned document text. Return valid JSON with keys like "
-                        "'document_type', 'name', 'date', 'total_amount', 'address'."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": f"Extract structured data from:\n\n{ocr_text}"
-                }
-            ]
+            # Build a single text prompt for text_generation
+            prompt = (
+                "You are Mistral OCR 2503, an AI assistant that extracts structured fields "
+                "from scanned document text.\n\n"
+                "Return ONLY valid JSON. Do not include any explanation, markdown, or backticks.\n"
+                "Use keys like 'document_type', 'name', 'date', 'total_amount', 'address'.\n\n"
+                "Here is the extracted OCR text:\n\n"
+                f"{ocr_text}\n\n"
+                "Now respond with JSON only:"
+            )
 
             try:
-                completion = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=messages,
-                    temperature=0.15
+                raw_output = client.text_generation(
+                    prompt=prompt,
+                    model=MODEL_NAME,   # omit this if you bound model in the client
+                    max_new_tokens=512,
+                    temperature=0.15,
                 )
-                output_json = completion.choices[0].message["content"]
+
+                output_json = raw_output.strip()
+
+                # Optional: clean up if model sneaks in ```json ``` fences
+                if output_json.startswith("```"):
+                    output_json = output_json.strip("`")
+                    output_json = output_json.replace("json", "", 1).strip()
 
                 try:
                     result = json.loads(output_json)
@@ -85,7 +90,8 @@ if uploaded_file:
                     pdf.add_page()
                     pdf.set_font("Arial", size=12)
                     for k, v in result.items():
-                        pdf.cell(200, 10, txt=f"{k}: {v}", ln=True)
+                        # Simple wrapping to avoid text going off the page
+                        pdf.multi_cell(0, 10, txt=f"{k}: {v}")
                     pdf.output("output.pdf")
 
                     with open("output.pdf", "rb") as f:
@@ -97,3 +103,4 @@ if uploaded_file:
 
             except Exception as e:
                 st.error(f"Error calling Mistral: {str(e)}")
+
