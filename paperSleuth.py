@@ -15,7 +15,8 @@ if not API_KEY:
     raise ValueError("Missing HF_API_KEY. Please set it in .env or as an environment variable.")
 
 MODEL_NAME = "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
-client = InferenceClient(provider="nebius", api_key=API_KEY)
+
+client = InferenceClient(api_key=API_KEY)
 
 st.set_page_config(page_title="PaperSleuth", layout="centered")
 st.title("PaperSleuth")
