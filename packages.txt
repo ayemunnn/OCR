@@ -1,4 +1,4 @@
 poppler-utils
 tesseract-ocr
 tesseract-ocr-eng
-openai>=1.42.0
+openai==1.30.1

@@ -59,65 +59,90 @@ if uploaded_file:
     st.subheader("OCR Text")
     st.text_area("Extracted Text", ocr_text, height=200)
 
-if st.button("Extract Structured Data"):
-    if not ocr_text.strip():
-        st.error("No OCR text found. Please upload a document first.")
-    else:
-        with st.spinner("Calling Mistral..."):
+if uploaded_file:
+    file_type = uploaded_file.type
+    st.subheader("Uploaded Document")
 
-            # Build a single prompt for the conversational task
-            prompt = (
-                "You are Mistral OCR 2503, an AI assistant that extracts structured fields "
-                "from scanned document text.\n\n"
-                "Return ONLY valid JSON. Do not include any explanation, markdown, or backticks.\n"
-                "Use keys like 'document_type', 'name', 'date', 'total_amount', 'address'.\n\n"
-                "Here is the extracted OCR text:\n\n"
-                f"{ocr_text}\n\n"
-                "Now respond with JSON only:"
-            )
+    if file_type == "application/pdf":
+        images = convert_from_bytes(uploaded_file.read())
+        st.write(f"PDF has {len(images)} pages. Processing...")
+        pages = []
+        for i, img in enumerate(images):
+            st.image(img, caption=f"Page {i+1}")
+            pages.append(run_ocr_on_image(img))
+        ocr_text = "\n\n".join(pages)
 
-            try:
-                # Use the provider's supported task: conversational
-                convo_output = client.conversational(
-                    prompt,
-                    model=MODEL_NAME,
-                    max_new_tokens=512,
-                    temperature=0.15,
-                )
+    elif "image" in file_type:
+        image = Image.open(uploaded_file)
+        st.image(image, caption="Uploaded Image")
+        ocr_text = run_ocr_on_image(image)
 
-                # HuggingFace 'conversational' returns a dict with 'generated_text'
-                output_json = convo_output.get("generated_text", "").strip()
+    st.subheader("OCR Text")
+    st.text_area("Extracted Text", ocr_text, height=200)
 
-                # Optional: clean up if the model sneaks in ```json fences
-                if output_json.startswith("```"):
-                    # strip backticks
-                    output_json = output_json.strip("`")
-                    # remove an initial 'json' tag if present
-                    if output_json.lower().startswith("json"):
-                        output_json = output_json[4:].strip()
+    if st.button("Extract Structured Data"):
+        if not ocr_text.strip():
+            st.error("No OCR text found. Please upload a document first.")
+        else:
+            with st.spinner("Calling model via Hugging Face router..."):
+
+                messages = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an AI assistant that extracts structured fields "
+                            "from scanned document text. "
+                            "Return ONLY valid JSON. "
+                            "Do not include markdown, backticks, or explanations.\n"
+                            "Use keys like 'document_type', 'name', 'date', "
+                            "'total_amount', 'address'."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Extract structured data from this OCR text:\n\n{ocr_text}",
+                    },
+                ]
 
                 try:
-                    result = json.loads(output_json)
-                    st.subheader("Structured Output")
-                    st.json(result)
+                    completion = client.chat.completions.create(
+                        model=MODEL_NAME,
+                        messages=messages,
+                        temperature=0.15,
+                        max_tokens=512,
+                    )
 
-                    # Create downloadable PDF
-                    pdf = FPDF()
-                    pdf.add_page()
-                    pdf.set_font("Arial", size=12)
-                    for k, v in result.items():
-                        # multi_cell avoids text going off the page
-                        pdf.multi_cell(0, 10, txt=f"{k}: {v}")
-                    pdf.output("output.pdf")
+                    output_json = completion.choices[0].message.content.strip()
 
-                    with open("output.pdf", "rb") as f:
-                        st.download_button("Download Output PDF", f, file_name="output.pdf")
+                    # Clean up ```json fences if the model tries to be fancy
+                    if output_json.startswith("```"):
+                        output_json = output_json.strip("`")
+                        if output_json.lower().startswith("json"):
+                            output_json = output_json[4:].strip()
 
-                except json.JSONDecodeError:
-                    st.error("Mistral did not return valid JSON.")
-                    st.code(output_json)
+                    try:
+                        result = json.loads(output_json)
+                        st.subheader("Structured Output")
+                        st.json(result)
 
-            except Exception as e:
-                st.error(f"Error calling Mistral: {str(e)}")
+                        # Create downloadable PDF
+                        pdf = FPDF()
+                        pdf.add_page()
+                        pdf.set_font("Arial", size=12)
+                        for k, v in result.items():
+                            pdf.multi_cell(0, 10, txt=f"{k}: {v}")
+                        pdf.output("output.pdf")
 
+                        with open("output.pdf", "rb") as f:
+                            st.download_button(
+                                "Download Output PDF",
+                                f,
+                                file_name="output.pdf",
+                            )
 
+                    except json.JSONDecodeError:
+                        st.error("Model did not return valid JSON.")
+                        st.code(output_json)
+
+                except Exception as e:
+                    st.error(f"Error calling model: {str(e)}")
