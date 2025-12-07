@@ -10,10 +10,6 @@ from fpdf import FPDF
 import json
 import os
 
-# ⚠️ LOCAL ONLY: comment this out on Streamlit Cloud
-# (that Windows path will NOT exist there)
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-
 # -----------------------------
 # 1. Auth & model config
 # -----------------------------
