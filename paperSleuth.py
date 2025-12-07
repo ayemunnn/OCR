@@ -26,11 +26,11 @@ if not API_KEY:
 # -----------------------------
 # 2. Model configuration
 # -----------------------------
-# IMPORTANT: replace this with YOUR Mistral model (non-chat is fine)
-# Example: "mistralai/Mistral-7B-Instruct-v0.3" or your own OCR/LLM model repo
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.3"
+# IMPORTANT: this model is "conversational" (chat-style) on HF
+# Use the exact model ID you're deploying on the router
+MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.3"  # <- change if you use a different Mistral model
 
-# Hugging Face Inference client (no OpenAI)
+# Hugging Face Inference client (NO OpenAI)
 client = InferenceClient(
     model=MODEL_NAME,
     token=API_KEY,
@@ -81,71 +81,65 @@ if uploaded_file:
     ocr_text = st.text_area("Extracted Text (you can edit this):", value=ocr_text, height=250)
 
     # -----------------------------
-    # 5. Call HF Mistral model (text_generation) for JSON extraction
+    # 5. Call HF Mistral (chat_completion) for JSON extraction
     # -----------------------------
     if st.button("Extract Structured Data"):
         if not ocr_text or not ocr_text.strip():
             st.error("No OCR text found. Please upload a document first.")
         else:
             with st.spinner("Calling Mistral model via Hugging Face Inference API..."):
-                # System-style instructions + OCR text in a single prompt
-                instructions = (
-                    "You are an AI assistant that extracts structured fields "
-                    "from noisy OCR text of documents such as invoices, receipts, "
-                    "letters, or forms.\n\n"
-                    "Return ONLY valid JSON (no markdown, no backticks, no explanations).\n"
-                    "If a field is missing, set its value to null or an empty string.\n"
-                    "Use keys like: 'document_type', 'name', 'date', 'invoice_number', "
-                    "'total_amount', 'address', 'items', or anything else appropriate.\n\n"
-                    "OCR_TEXT:\n"
-                )
-
-                prompt = instructions + ocr_text
+                messages = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an AI assistant that extracts structured fields "
+                            "from noisy OCR text of documents such as invoices, receipts, "
+                            "letters, or forms.\n\n"
+                            "Return ONLY valid JSON (no markdown, no backticks, no extra text).\n"
+                            "If a field is missing, set its value to null or an empty string.\n"
+                            "Use keys like: 'document_type', 'name', 'date', 'invoice_number', "
+                            "'total_amount', 'address', 'items', or anything else appropriate."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Extract structured data from this OCR text:\n\n{ocr_text}",
+                    },
+                ]
 
                 try:
-                    # For non-chat models: plain text generation
-                    raw_output = client.text_generation(
-                        prompt=prompt,
-                        max_new_tokens=512,
+                    completion = client.chat_completion(
+                        model=MODEL_NAME,      # explicit model; fine to keep
+                        messages=messages,
                         temperature=0.15,
-                        repetition_penalty=1.1,
+                        max_tokens=512,
                     )
 
-                    # -----------------------------
-                    # 6. Clean model output and extract JSON
-                    # -----------------------------
-                    output = raw_output.strip()
-
-                    # Remove ```json or ``` fences if present
-                    if "```" in output:
-                        # Keep content between the first and last ```
-                        parts = output.split("```")
-                        if len(parts) >= 3:
-                            output = parts[1]  # often the middle part
-                        output = output.strip()
-                        # Remove leading 'json' tag
-                        if output.lower().startswith("json"):
-                            output = output[4:].strip()
-
-                    # Try to locate JSON object between first '{' and last '}'
-                    start = output.find("{")
-                    end = output.rfind("}")
-                    if start != -1 and end != -1 and end > start:
-                        json_candidate = output[start : end + 1]
+                    # HuggingFace ChatCompletionOutput structure
+                    choice = completion.choices[0].message
+                    if isinstance(choice, dict):
+                        output_json = (choice.get("content") or "").strip()
                     else:
-                        json_candidate = output
+                        # if it's a dataclass-like object
+                        output_json = getattr(choice, "content", "").strip()
+
+                    # Clean up ```json fences if model adds them
+                    if output_json.startswith("```"):
+                        output_json = output_json.strip("`")
+                        if output_json.lower().startswith("json"):
+                            output_json = output_json[4:].strip()
 
                     # -----------------------------
-                    # 7. Parse JSON and show result
+                    # 6. Parse JSON and show result
                     # -----------------------------
                     try:
-                        result = json.loads(json_candidate)
+                        result = json.loads(output_json)
 
                         st.subheader("Structured Output")
                         st.json(result)
 
                         # -----------------------------
-                        # 8. Create downloadable PDF from structured data
+                        # 7. Create downloadable PDF from structured data
                         # -----------------------------
                         pdf = FPDF()
                         pdf.add_page()
@@ -178,8 +172,8 @@ if uploaded_file:
                             )
 
                     except json.JSONDecodeError:
-                        st.error("Model did not return valid JSON. Here is the raw output I got:")
-                        st.code(output)
+                        st.error("Model did not return valid JSON. Here is the raw output:")
+                        st.code(output_json)
 
                 except Exception as e:
                     st.error(f"Error calling Hugging Face Mistral model: {str(e)}")
