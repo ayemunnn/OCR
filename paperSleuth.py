@@ -9,26 +9,32 @@ from huggingface_hub import InferenceClient
 from fpdf import FPDF
 import json
 import os
+
+# ⚠️ LOCAL ONLY: comment this out on Streamlit Cloud
+# (that Windows path will NOT exist there)
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
 # -----------------------------
 # 1. Auth & model config
 # -----------------------------
 API_KEY = os.getenv("HF_API_KEY")
 if not API_KEY:
-    raise ValueError("Hugging Face API key not found. Set the 'HF_API_KEY' environment variable.")
+    raise ValueError("Hugging Face API key not found. Set 'HF_API_KEY' in your env or Streamlit secrets.")
 
-MODEL_NAME = "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+# Your chosen model
+MODEL_NAME = "google/gemma-3-27b-it"
 
+# Use HF Inference directly (no provider override)
 client = InferenceClient(
     model=MODEL_NAME,
     token=API_KEY,
-    provider="nebius",
 )
 
 # -----------------------------
 # 2. Streamlit UI
 # -----------------------------
-st.set_page_config(page_title="📄 Mistral OCR 2503", layout="centered")
-st.title("📄 Mistral OCR 2503 - Document Parser")
+st.set_page_config(page_title="📄 Gemma 3 27B OCR Parser", layout="centered")
+st.title("📄 Gemma 3 27B - Document OCR & Parser")
 
 uploaded_file = st.file_uploader(
     "Upload a scanned document (PDF or image)",
@@ -63,25 +69,32 @@ if uploaded_file:
         ocr_text = pytesseract.image_to_string(img)
 
     st.subheader("📝 OCR Extracted Text")
-    ocr_text = st.text_area("OCR Output (you can edit before sending to Mistral)", ocr_text, height=250)
+    ocr_text = st.text_area(
+        "OCR Output (you can edit before sending to Gemma)",
+        ocr_text,
+        height=250
+    )
 
     # -----------------------------
-    # 4. Send to Mistral for structuring
+    # 4. Send to Gemma for structuring
     # -----------------------------
-    if st.button("🧠 Extract Structured Data with Mistral OCR 2503"):
+    if st.button("🧠 Extract Structured Data"):
         if not ocr_text.strip():
             st.error("No OCR text found. Please upload a document first.")
         else:
-            with st.spinner("Contacting Mistral OCR 2503..."):
+            with st.spinner("Contacting Gemma 3 27B via Hugging Face Inference API..."):
 
                 messages = [
                     {
                         "role": "system",
                         "content": (
-                            "You are Mistral OCR 2503, an AI assistant that extracts structured fields "
-                            "from scanned document text. Return ONLY clean, valid JSON with keys like "
-                            "'document_type', 'name', 'date', 'total_amount', 'address', 'items'. "
-                            "Do not include any explanation, markdown, or backticks."
+                            "You are an AI assistant that extracts structured fields "
+                            "from noisy OCR text of documents such as invoices, receipts, "
+                            "letters, or forms.\n\n"
+                            "Return ONLY clean, valid JSON (no markdown, no backticks, no extra text).\n"
+                            "If a field is missing, set its value to null or an empty string.\n"
+                            "Use keys like: 'document_type', 'name', 'date', 'invoice_number', "
+                            "'total_amount', 'address', 'items'."
                         ),
                     },
                     {
@@ -92,7 +105,7 @@ if uploaded_file:
 
                 try:
                     completion = client.chat_completion(
-                        model=MODEL_NAME,
+                        model=MODEL_NAME,   # explicit; fine to keep
                         messages=messages,
                         temperature=0.15,
                         max_tokens=512,
@@ -141,10 +154,14 @@ if uploaded_file:
                         pdf.output(pdf_file)
 
                         with open(pdf_file, "rb") as f:
-                            st.download_button("📄 Download PDF", f, file_name="extracted_output.pdf")
+                            st.download_button(
+                                "📄 Download PDF",
+                                f,
+                                file_name="extracted_output.pdf"
+                            )
 
                     except json.JSONDecodeError:
-                        st.error("Mistral did not return valid JSON. Raw output:")
+                        st.error("Model did not return valid JSON. Raw output:")
                         st.code(output_json_str)
 
                 except Exception as e:
