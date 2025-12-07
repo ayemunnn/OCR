@@ -1,8 +1,7 @@
-streamlit==1.39.0
-Pillow
-pdf2image
+streamlit
+pillow
 pytesseract
-huggingface_hub
+pdf2image
+fpdf
 python-dotenv
-fpdf2
-openai==1.30.1
+huggingface_hub>=0.26.2
