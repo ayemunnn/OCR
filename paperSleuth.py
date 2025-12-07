@@ -1,179 +1,122 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import streamlit as st
 from PIL import Image
-from pdf2image import convert_from_bytes
 import pytesseract
+from huggingface_hub import InferenceClient
 from fpdf import FPDF
 import json
 import os
-from dotenv import load_dotenv
-from huggingface_hub import InferenceClient
-
 # -----------------------------
-# 1. Load env variables
+# 1. Auth & model config
 # -----------------------------
-load_dotenv()
-
-# Prefer Streamlit Secrets in the cloud, fall back to env locally
-API_KEY = None
-try:
-    API_KEY = st.secrets["HF_API_KEY"]
-except Exception:
-    API_KEY = os.getenv("HF_API_KEY")
-
+API_KEY = os.getenv("HF_API_KEY")
 if not API_KEY:
-    raise ValueError("Missing HF_API_KEY. Please set it in Streamlit Secrets or as an environment variable.")
+    raise ValueError("Hugging Face API key not found. Set the 'HF_API_KEY' environment variable.")
 
-# -----------------------------
-# 2. Model configuration
-# -----------------------------
-# IMPORTANT: this model is "conversational" (chat-style) on HF
-# Use the exact model ID you're deploying on the router
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.3"  # <- change if you use a different Mistral model
+MODEL_NAME = "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
 
-# Hugging Face Inference client (NO OpenAI)
+# Initialize Hugging Face client (no OpenAI here)
 client = InferenceClient(
     model=MODEL_NAME,
-    token=API_KEY,
+    token=API_KEY,        # <- use token instead of api_key
+    provider="nebius",    # using HF router provider
 )
 
 # -----------------------------
-# 3. Streamlit UI setup
+# 2. Streamlit UI
 # -----------------------------
-st.set_page_config(page_title="PaperSleuth", layout="centered")
-st.title("📄 PaperSleuth")
-st.write("Upload a scanned PDF or image, extract text with OCR, and convert it into structured data.")
+st.set_page_config(page_title="📄 Mistral OCR 2503", layout="centered")
+st.title("📄 Mistral OCR 2503 - Document Parser")
 
-uploaded_file = st.file_uploader("Upload PDF or image", type=["pdf", "png", "jpg", "jpeg"])
+uploaded_file = st.file_uploader("Upload a scanned document (image)", type=["png", "jpg", "jpeg"])
 
-ocr_text = ""
-
-
-def run_ocr_on_image(image: Image.Image) -> str:
-    """Run Tesseract OCR on a PIL image and return the extracted text."""
-    return pytesseract.image_to_string(image)
-
-
-# -----------------------------
-# 4. Handle upload + OCR
-# -----------------------------
 if uploaded_file:
-    file_type = uploaded_file.type
-    st.subheader("Uploaded Document")
+    img = Image.open(uploaded_file)
+    st.image(img, caption="Uploaded Image", use_column_width=True)
 
-    if file_type == "application/pdf":
-        # Read bytes once for pdf
-        pdf_bytes = uploaded_file.read()
-        images = convert_from_bytes(pdf_bytes)
-        st.write(f"PDF has {len(images)} pages. Processing...")
-        pages = []
-        for i, img in enumerate(images):
-            st.image(img, caption=f"Page {i + 1}", use_column_width=True)
-            pages.append(run_ocr_on_image(img))
-        ocr_text = "\n\n".join(pages)
+    # Step 1: OCR
+    ocr_text = pytesseract.image_to_string(img)
+    st.subheader("📝 OCR Extracted Text")
+    ocr_text = st.text_area("OCR Output", ocr_text, height=200)
 
-    elif "image" in file_type:
-        image = Image.open(uploaded_file)
-        st.image(image, caption="Uploaded Image", use_column_width=True)
-        ocr_text = run_ocr_on_image(image)
+    if st.button("🧠 Extract Structured Data with Mistral OCR 2503"):
+        with st.spinner("Contacting Mistral OCR 2503..."):
 
-    # Allow user to edit the OCR text before sending to the model
-    st.subheader("OCR Text")
-    ocr_text = st.text_area("Extracted Text (you can edit this):", value=ocr_text, height=250)
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Mistral OCR 2503, an AI assistant that extracts structured fields "
+                        "from scanned document text. Return ONLY clean, valid JSON with keys like "
+                        "'document_type', 'name', 'date', 'total_amount', 'address'. "
+                        "Do not include any explanation, markdown, or backticks."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Extract structured data from this document:\n\n{ocr_text}",
+                },
+            ]
 
-    # -----------------------------
-    # 5. Call HF Mistral (chat_completion) for JSON extraction
-    # -----------------------------
-    if st.button("Extract Structured Data"):
-        if not ocr_text or not ocr_text.strip():
-            st.error("No OCR text found. Please upload a document first.")
-        else:
-            with st.spinner("Calling Mistral model via Hugging Face Inference API..."):
-                messages = [
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an AI assistant that extracts structured fields "
-                            "from noisy OCR text of documents such as invoices, receipts, "
-                            "letters, or forms.\n\n"
-                            "Return ONLY valid JSON (no markdown, no backticks, no extra text).\n"
-                            "If a field is missing, set its value to null or an empty string.\n"
-                            "Use keys like: 'document_type', 'name', 'date', 'invoice_number', "
-                            "'total_amount', 'address', 'items', or anything else appropriate."
-                        ),
-                    },
-                    {
-                        "role": "user",
-                        "content": f"Extract structured data from this OCR text:\n\n{ocr_text}",
-                    },
-                ]
+            try:
+                # HF-style chat completion (NOT OpenAI client)
+                completion = client.chat_completion(
+                    model=MODEL_NAME,      # explicit; OK even though set in client
+                    messages=messages,
+                    temperature=0.15,
+                    max_tokens=512,
+                )
+
+                # Handle both dict-style and object-style message
+                choice = completion.choices[0].message
+                if isinstance(choice, dict):
+                    output_json_str = (choice.get("content") or "").strip()
+                else:
+                    output_json_str = getattr(choice, "content", "") or ""
+                    output_json_str = output_json_str.strip()
+
+                # Clean ```json fences if the model adds them
+                if output_json_str.startswith("```"):
+                    output_json_str = output_json_str.strip("`")
+                    if output_json_str.lower().startswith("json"):
+                        output_json_str = output_json_str[4:].strip()
+
+                # Try to isolate JSON between first { and last }
+                start = output_json_str.find("{")
+                end = output_json_str.rfind("}")
+                if start != -1 and end != -1 and end > start:
+                    json_candidate = output_json_str[start : end + 1]
+                else:
+                    json_candidate = output_json_str
 
                 try:
-                    completion = client.chat_completion(
-                        model=MODEL_NAME,      # explicit model; fine to keep
-                        messages=messages,
-                        temperature=0.15,
-                        max_tokens=512,
-                    )
+                    extracted_data = json.loads(json_candidate)
 
-                    # HuggingFace ChatCompletionOutput structure
-                    choice = completion.choices[0].message
-                    if isinstance(choice, dict):
-                        output_json = (choice.get("content") or "").strip()
-                    else:
-                        # if it's a dataclass-like object
-                        output_json = getattr(choice, "content", "").strip()
+                    st.subheader("📦 Structured Output")
+                    st.json(extracted_data)
 
-                    # Clean up ```json fences if model adds them
-                    if output_json.startswith("```"):
-                        output_json = output_json.strip("`")
-                        if output_json.lower().startswith("json"):
-                            output_json = output_json[4:].strip()
+                    # Step 4: Generate PDF
+                    pdf = FPDF()
+                    pdf.add_page()
+                    pdf.set_font("Arial", size=12)
 
-                    # -----------------------------
-                    # 6. Parse JSON and show result
-                    # -----------------------------
-                    try:
-                        result = json.loads(output_json)
+                    for key, value in extracted_data.items():
+                        # stringify nested objects
+                        if not isinstance(value, (str, int, float, type(None))):
+                            value = json.dumps(value, ensure_ascii=False)
+                        pdf.multi_cell(0, 10, txt=f"{key}: {value}")
 
-                        st.subheader("Structured Output")
-                        st.json(result)
+                    pdf_file = "extracted_data.pdf"
+                    pdf.output(pdf_file)
 
-                        # -----------------------------
-                        # 7. Create downloadable PDF from structured data
-                        # -----------------------------
-                        pdf = FPDF()
-                        pdf.add_page()
-                        pdf.set_auto_page_break(auto=True, margin=15)
-                        pdf.set_font("Arial", size=12)
+                    with open(pdf_file, "rb") as f:
+                        st.download_button("📄 Download PDF", f, file_name="extracted_output.pdf")
 
-                        pdf.cell(0, 10, txt="PaperSleuth - Extracted Data", ln=True)
-                        pdf.ln(5)
+                except json.JSONDecodeError:
+                    st.error("Mistral did not return valid JSON. Raw output:")
+                    st.code(output_json_str)
 
-                        if isinstance(result, dict):
-                            for k, v in result.items():
-                                # Convert complex objects to string
-                                if not isinstance(v, (str, int, float, type(None))):
-                                    v = json.dumps(v, ensure_ascii=False)
-                                pdf.multi_cell(0, 8, txt=f"{k}: {v}")
-                                pdf.ln(1)
-                        else:
-                            # Fallback if result is not a dict
-                            pdf.multi_cell(0, 8, txt=json.dumps(result, ensure_ascii=False, indent=2))
-
-                        output_pdf_path = "output.pdf"
-                        pdf.output(output_pdf_path)
-
-                        with open(output_pdf_path, "rb") as f:
-                            st.download_button(
-                                "Download Output as PDF",
-                                f,
-                                file_name="paperSleuth_output.pdf",
-                                mime="application/pdf",
-                            )
-
-                    except json.JSONDecodeError:
-                        st.error("Model did not return valid JSON. Here is the raw output:")
-                        st.code(output_json)
-
-                except Exception as e:
-                    st.error(f"Error calling Hugging Face Mistral model: {str(e)}")
+            except Exception as e:
+                st.error(f"API call failed: {str(e)}")
