@@ -4,3 +4,7 @@ python-dotenv
 pydantic
 pydantic-settings
 python-multipart
+pdf2image
+pytesseract
+pillow
+huggingface_hub
