@@ -1,5 +1,8 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy.orm import Session
 
+from app.db.session import get_db
+from app.models.document import Document
 from app.services.llm_service import analyze_document_text
 from app.services.ocr_service import extract_text_from_images
 from app.services.pdf_service import (
@@ -19,11 +22,37 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 
 @router.post("/process")
-async def process_document(file: UploadFile = File(...)):
+async def process_document(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
     temp_path = None
     document_id = None
     document_folder = None
     saved_files = {}
+
+    def saved_path(key: str) -> str | None:
+        metadata = saved_files.get(key)
+        if not metadata:
+            return None
+        return metadata.get("path")
+
+    def save_document_record(status: str, error_message: str | None = None) -> None:
+        if not document_id or not document_folder:
+            return
+
+        document = Document(
+            document_id=document_id,
+            original_filename=file.filename or "",
+            storage_folder=document_folder,
+            original_pdf_path=saved_path("original_pdf"),
+            extracted_text_path=saved_path("extracted_text"),
+            output_json_path=saved_path("structured_output"),
+            status=status,
+            error_message=error_message,
+        )
+        db.add(document)
+        db.commit()
 
     try:
         validate_pdf_filename(file.filename)
@@ -54,6 +83,7 @@ async def process_document(file: UploadFile = File(...)):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
+        save_document_record("failed", str(exc))
         raise HTTPException(
             status_code=500,
             detail=f"OCR processing failed: {exc}",
@@ -75,6 +105,8 @@ async def process_document(file: UploadFile = File(...)):
             llm_message = f"LLM processing failed: {exc}"
     else:
         llm_message = "LLM processing skipped because no OCR text was extracted."
+
+    save_document_record(llm_message)
 
     return {
         "filename": file.filename,
