@@ -1,1 +1,1 @@
-from app.models.document import Base, Document  # noqa: F401
+from ..models.document import Base, Document  # noqa: F401

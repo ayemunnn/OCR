@@ -1,17 +1,17 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.models.document import Document
-from app.services.llm_service import analyze_document_text
-from app.services.ocr_service import extract_text_from_images
-from app.services.pdf_service import (
+from ..db.session import get_db
+from ..models.document import Document
+from ..services.llm_service import analyze_document_text
+from ..services.ocr_service import extract_text_from_images
+from ..services.pdf_service import (
     cleanup_file,
     convert_pdf_bytes_to_images,
     save_temp_pdf,
     validate_pdf_filename,
 )
-from app.services.storage_service import (
+from ..services.storage_service import (
     create_document_folder,
     save_extracted_text,
     save_original_pdf,

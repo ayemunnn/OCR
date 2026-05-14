@@ -2,8 +2,8 @@ from typing import Any
 
 from huggingface_hub import InferenceClient
 
-from app.core.config import Settings, get_settings
-from app.services.json_service import parse_json_response
+from ..core.config import Settings, get_settings
+from .json_service import parse_json_response
 
 
 def build_document_extraction_prompt() -> str:
