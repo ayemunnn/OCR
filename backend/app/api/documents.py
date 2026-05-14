@@ -1,8 +1,12 @@
+import json
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from ..db.session import get_db
 from ..models.document import Document
+from ..schemas.document import DocumentListResponse, DocumentResponse
 from ..services.llm_service import analyze_document_text
 from ..services.ocr_service import extract_text_from_images
 from ..services.pdf_service import (
@@ -19,6 +23,66 @@ from ..services.storage_service import (
 )
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+
+
+def get_document_or_404(document_id: str, db: Session) -> Document:
+    document = db.query(Document).filter(Document.document_id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return document
+
+
+@router.get("", response_model=DocumentListResponse)
+def list_documents(db: Session = Depends(get_db)):
+    documents = db.query(Document).order_by(Document.created_at.desc()).all()
+    return {"documents": documents}
+
+
+@router.get("/{document_id}", response_model=DocumentResponse)
+def get_document(document_id: str, db: Session = Depends(get_db)):
+    return get_document_or_404(document_id, db)
+
+
+@router.get("/{document_id}/text")
+def get_document_text(document_id: str, db: Session = Depends(get_db)):
+    document = get_document_or_404(document_id, db)
+    if not document.extracted_text_path:
+        raise HTTPException(status_code=404, detail="Extracted text file not found.")
+
+    text_path = Path(document.extracted_text_path)
+    if not text_path.exists():
+        raise HTTPException(status_code=404, detail="Extracted text file not found.")
+
+    return {
+        "document_id": document.document_id,
+        "filename": text_path.name,
+        "text": text_path.read_text(encoding="utf-8"),
+    }
+
+
+@router.get("/{document_id}/json")
+def get_document_json(document_id: str, db: Session = Depends(get_db)):
+    document = get_document_or_404(document_id, db)
+    if not document.output_json_path:
+        raise HTTPException(status_code=404, detail="Output JSON file not found.")
+
+    json_path = Path(document.output_json_path)
+    if not json_path.exists():
+        raise HTTPException(status_code=404, detail="Output JSON file not found.")
+
+    try:
+        output = json.loads(json_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Output JSON file is invalid: {exc}",
+        ) from exc
+
+    return {
+        "document_id": document.document_id,
+        "filename": json_path.name,
+        "output": output,
+    }
 
 
 @router.post("/process")
