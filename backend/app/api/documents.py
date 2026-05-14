@@ -8,6 +8,12 @@ from app.services.pdf_service import (
     save_temp_pdf,
     validate_pdf_filename,
 )
+from app.services.storage_service import (
+    create_document_folder,
+    save_extracted_text,
+    save_original_pdf,
+    save_structured_output,
+)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -15,6 +21,9 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 @router.post("/process")
 async def process_document(file: UploadFile = File(...)):
     temp_path = None
+    document_id = None
+    document_folder = None
+    saved_files = {}
 
     try:
         validate_pdf_filename(file.filename)
@@ -29,9 +38,17 @@ async def process_document(file: UploadFile = File(...)):
         if not file_bytes:
             raise HTTPException(status_code=400, detail="Uploaded PDF is empty.")
 
+        document_metadata = create_document_folder()
+        document_id = document_metadata["document_id"]
+        document_folder = document_metadata["folder_path"]
+        saved_files.update(
+            save_original_pdf(document_folder, file.filename, file_bytes)
+        )
+
         temp_path = save_temp_pdf(file_bytes)
         images = convert_pdf_bytes_to_images(file_bytes)
         extracted_text = extract_text_from_images(images)
+        saved_files.update(save_extracted_text(document_folder, extracted_text))
     except HTTPException:
         raise
     except ValueError as exc:
@@ -51,6 +68,9 @@ async def process_document(file: UploadFile = File(...)):
             llm_result = analyze_document_text(extracted_text)
             structured_output = llm_result["structured_output"]
             llm_message = llm_result["message"]
+            saved_files.update(
+                save_structured_output(document_folder, structured_output)
+            )
         except Exception as exc:
             llm_message = f"LLM processing failed: {exc}"
     else:
@@ -58,7 +78,9 @@ async def process_document(file: UploadFile = File(...)):
 
     return {
         "filename": file.filename,
+        "status": llm_message,
+        "document_id": document_id,
         "extracted_text_preview": extracted_text[:1000],
         "structured_output": structured_output,
-        "status": llm_message,
+        "saved_files": saved_files,
     }
