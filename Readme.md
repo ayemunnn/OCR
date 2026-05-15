@@ -39,6 +39,8 @@ Open the API docs at:
 http://127.0.0.1:8000/docs
 ```
 
+For local frontend development, the backend allows CORS requests from common dev origins such as `http://localhost:3000` and `http://localhost:5173`. Override `BACKEND_CORS_ORIGINS` in `backend/.env` if you need different origins.
+
 To test PDF processing, open Swagger UI, expand `POST /documents/process`, upload a PDF file, and execute the request.
 
 If `HF_API_KEY` is not configured, the endpoint still runs OCR and returns:
