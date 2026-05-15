@@ -1,57 +1,44 @@
-# 🧠 PaperSleuth
+# PaperSleuth
 
-PaperSleuth is a Streamlit app that extracts structured data from scanned documents using OCR (Tesseract) and the Mistral-Small-3.1-24B-Instruct-2503 LLM via Hugging Face.
+PaperSleuth is being upgraded from a working Streamlit OCR app into a local SaaS MVP with a FastAPI backend and React frontend.
 
-## 📦 Features
-- Upload PDFs or images
-- Extract text using Tesseract
-- Call Mistral OCR 2503 for structured JSON extraction
-- Download output as a PDF
+The original Streamlit app, `paperSleuth.py`, is preserved during the migration and should not be deleted or broken.
 
-## 🚀 Setup
+## Current MVP
 
-### Clone and install dependencies
+- FastAPI backend with health, auth, document processing, and document history endpoints.
+- JWT authentication with signup, login, and `/auth/me`.
+- User-owned document records stored in SQLite.
+- Local file storage under `backend/storage/` for uploaded PDFs, OCR text, and JSON output.
+- React/Vite frontend for signup, login, PDF upload, history, extracted text, and JSON viewing.
+- CORS configured for local frontend development.
 
-```bash
-git clone https://github.com/your-username/paperSleuth.git
-cd paperSleuth
-pip install -r requirements.txt
-```
-
-## FastAPI Backend
-
-Install backend dependencies:
+## Local Backend Setup With Conda
 
 ```bash
+conda create -n papersleuth python=3.11 -y
+conda activate papersleuth
 cd backend
 pip install -r requirements.txt
-```
-
-Run the backend API:
-
-```bash
 uvicorn app.main:app --reload
 ```
 
-Open the API docs at:
+Backend URL:
+
+```text
+http://127.0.0.1:8000
+```
+
+API docs:
 
 ```text
 http://127.0.0.1:8000/docs
 ```
 
-For local frontend development, the backend allows CORS requests from common dev origins such as `http://localhost:3000` and `http://localhost:5173`. Override `BACKEND_CORS_ORIGINS` in `backend/.env` if you need different origins.
+The backend requires OCR system tools for full PDF processing:
 
-To test PDF processing, open Swagger UI, expand `POST /documents/process`, upload a PDF file, and execute the request.
-
-If `HF_API_KEY` is not configured, the endpoint still runs OCR and returns:
-
-```text
-LLM processing skipped because API key is not configured.
-```
-
-### Local SQLite schema changes
-
-This project does not use Alembic yet. During local development, if a model change adds columns or tables and the backend fails because the existing SQLite schema is stale, stop the backend and delete `backend/papersleuth.db`. The app will recreate the local database on startup.
+- Tesseract OCR
+- Poppler
 
 ## Frontend Development
 
@@ -62,3 +49,87 @@ cd frontend
 npm install
 npm run dev
 ```
+
+Frontend URL:
+
+```text
+http://127.0.0.1:5173
+```
+
+To point the frontend at a different backend, create a frontend environment file with:
+
+```text
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+## End-to-End Test Flow
+
+1. Start the backend.
+2. Start the frontend.
+3. Open `http://127.0.0.1:5173`.
+4. Sign up for a local user account.
+5. Log in.
+6. Upload a PDF.
+7. View document history.
+8. Select a document.
+9. View extracted text.
+10. View JSON output if LLM output is available.
+
+If `HF_API_KEY` is not configured, the backend still runs OCR and reports that LLM processing was skipped.
+
+## Docker Workflow
+
+Docker is optional. The normal Miniconda workflow remains supported.
+
+Build and run the backend with SQLite:
+
+```bash
+docker compose up --build backend
+```
+
+Run the optional PostgreSQL service for local experimentation:
+
+```bash
+docker compose --profile postgres up postgres
+```
+
+To use PostgreSQL with the backend, set `DATABASE_URL` to a PostgreSQL URL before starting the backend. SQLite remains the default for local development.
+
+## Database Notes
+
+SQLite is for local development only. Production or Azure deployments should use PostgreSQL, ideally Azure Database for PostgreSQL.
+
+This project does not use Alembic yet. During local development, if a model change adds columns or tables and the backend fails because the existing SQLite schema is stale, stop the backend and delete:
+
+```text
+backend/papersleuth.db
+```
+
+The app will recreate the local database on startup.
+
+## Ignored Local Files
+
+These should not be committed:
+
+- `.env`
+- `backend/storage/`
+- `backend/papersleuth.db`
+- generated PDF/log/cache files
+
+Use `.env.example` files only for documenting configuration.
+
+## Azure Readiness
+
+See:
+
+```text
+docs/AZURE_DEPLOYMENT_PLAN.md
+```
+
+Planned Azure services:
+
+- Azure App Service or Azure Container Apps for the backend.
+- Azure Static Web Apps for the frontend.
+- Azure Database for PostgreSQL.
+- Azure Blob Storage.
+- Azure App Settings or Key Vault for secrets.
