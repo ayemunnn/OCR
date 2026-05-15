@@ -1,6 +1,4 @@
-from .base import Base
-from .session import engine
-
-
 def init_db() -> None:
-    Base.metadata.create_all(bind=engine)
+    # Tables are managed by Alembic migrations.
+    # Run: alembic -c alembic.ini upgrade head
+    return None

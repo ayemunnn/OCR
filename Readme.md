@@ -20,6 +20,7 @@ conda create -n papersleuth python=3.11 -y
 conda activate papersleuth
 cd backend
 pip install -r requirements.txt
+alembic -c alembic.ini upgrade head
 uvicorn app.main:app --reload
 ```
 
@@ -97,17 +98,54 @@ docker compose --profile postgres up postgres
 
 To use PostgreSQL with the backend, set `DATABASE_URL` to a PostgreSQL URL before starting the backend. SQLite remains the default for local development.
 
-## Database Notes
+## Database Migrations
 
 SQLite is for local development only. Production or Azure deployments should use PostgreSQL, ideally Azure Database for PostgreSQL.
 
-This project does not use Alembic yet. During local development, if a model change adds columns or tables and the backend fails because the existing SQLite schema is stale, stop the backend and delete:
+PaperSleuth uses Alembic for database migrations. Run migrations from the `backend/` folder:
+
+```bash
+alembic -c alembic.ini upgrade head
+```
+
+Create a future migration after model changes with:
+
+```bash
+alembic -c alembic.ini revision --autogenerate -m "describe change"
+```
+
+Then review the generated migration before applying it.
+
+If your existing local SQLite database was created before Alembic was added, stop the backend, delete:
 
 ```text
 backend/papersleuth.db
 ```
 
-The app will recreate the local database on startup.
+Then run:
+
+```bash
+cd backend
+alembic -c alembic.ini upgrade head
+```
+
+Docker runs migrations automatically before starting the backend.
+
+## PostgreSQL Readiness
+
+SQLite remains the default for local development. PostgreSQL can be tested locally by setting `DATABASE_URL` to a PostgreSQL connection string, for example:
+
+```text
+DATABASE_URL=postgresql://papersleuth:papersleuth_dev_password@localhost:5432/papersleuth
+```
+
+Start the optional PostgreSQL service with:
+
+```bash
+docker compose --profile postgres up postgres
+```
+
+Then run Alembic against that `DATABASE_URL` before starting the backend.
 
 ## Storage Providers
 
