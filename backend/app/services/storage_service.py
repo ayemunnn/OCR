@@ -24,6 +24,15 @@ def create_document_folder(storage_root: Path = STORAGE_ROOT) -> dict[str, Any]:
     }
 
 
+def save_upload(
+    document_folder: str | Path,
+    filename: str,
+    file_bytes: bytes,
+) -> dict[str, Any]:
+    # TODO: Add an Azure Blob implementation behind this helper later.
+    return save_original_pdf(document_folder, filename, file_bytes)
+
+
 def save_original_pdf(
     document_folder: str | Path,
     filename: str,
@@ -43,6 +52,7 @@ def save_original_pdf(
 
 
 def save_extracted_text(document_folder: str | Path, extracted_text: str) -> dict[str, Any]:
+    # TODO: Add an Azure Blob implementation behind this helper later.
     destination = Path(document_folder) / "extracted_text.txt"
     destination.write_text(extracted_text, encoding="utf-8")
 
@@ -53,6 +63,14 @@ def save_extracted_text(document_folder: str | Path, extracted_text: str) -> dic
             "size_bytes": destination.stat().st_size,
         }
     }
+
+
+def save_output_json(
+    document_folder: str | Path,
+    structured_output: dict[str, Any] | None,
+) -> dict[str, Any]:
+    # TODO: Add an Azure Blob implementation behind this helper later.
+    return save_structured_output(document_folder, structured_output)
 
 
 def save_structured_output(
@@ -75,3 +93,27 @@ def save_structured_output(
             "size_bytes": destination.stat().st_size,
         }
     }
+
+
+def read_extracted_text(path: str | Path | None) -> str:
+    # TODO: Add an Azure Blob implementation behind this helper later.
+    if not path:
+        raise FileNotFoundError("Extracted text file is not available.")
+
+    text_path = Path(path)
+    if not text_path.exists():
+        raise FileNotFoundError("Extracted text file is not available.")
+
+    return text_path.read_text(encoding="utf-8")
+
+
+def read_output_json(path: str | Path | None) -> dict[str, Any]:
+    # TODO: Add an Azure Blob implementation behind this helper later.
+    if not path:
+        raise FileNotFoundError("Output JSON file is not available.")
+
+    json_path = Path(path)
+    if not json_path.exists():
+        raise FileNotFoundError("Output JSON file is not available.")
+
+    return json.loads(json_path.read_text(encoding="utf-8"))

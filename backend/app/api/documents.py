@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -19,9 +18,11 @@ from ..services.pdf_service import (
 )
 from ..services.storage_service import (
     create_document_folder,
+    read_extracted_text,
+    read_output_json,
     save_extracted_text,
-    save_original_pdf,
-    save_structured_output,
+    save_output_json,
+    save_upload,
 )
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -71,17 +72,15 @@ def get_document_text(
     db: Session = Depends(get_db),
 ):
     document = get_document_or_404(document_id, current_user, db)
-    if not document.extracted_text_path:
-        raise HTTPException(status_code=404, detail="Extracted text file not found.")
-
-    text_path = Path(document.extracted_text_path)
-    if not text_path.exists():
+    try:
+        text = read_extracted_text(document.extracted_text_path)
+    except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Extracted text file not found.")
 
     return {
         "document_id": document.document_id,
-        "filename": text_path.name,
-        "text": text_path.read_text(encoding="utf-8"),
+        "filename": "extracted_text.txt",
+        "text": text,
     }
 
 
@@ -92,15 +91,10 @@ def get_document_json(
     db: Session = Depends(get_db),
 ):
     document = get_document_or_404(document_id, current_user, db)
-    if not document.output_json_path:
-        raise HTTPException(status_code=404, detail="Output JSON file not found.")
-
-    json_path = Path(document.output_json_path)
-    if not json_path.exists():
-        raise HTTPException(status_code=404, detail="Output JSON file not found.")
-
     try:
-        output = json.loads(json_path.read_text(encoding="utf-8"))
+        output = read_output_json(document.output_json_path)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Output JSON file not found.")
     except json.JSONDecodeError as exc:
         raise HTTPException(
             status_code=500,
@@ -109,7 +103,7 @@ def get_document_json(
 
     return {
         "document_id": document.document_id,
-        "filename": json_path.name,
+        "filename": "output.json",
         "output": output,
     }
 
@@ -166,7 +160,7 @@ async def process_document(
         document_id = document_metadata["document_id"]
         document_folder = document_metadata["folder_path"]
         saved_files.update(
-            save_original_pdf(document_folder, file.filename, file_bytes)
+            save_upload(document_folder, file.filename, file_bytes)
         )
 
         temp_path = save_temp_pdf(file_bytes)
@@ -181,7 +175,10 @@ async def process_document(
         save_document_record("failed", str(exc))
         raise HTTPException(
             status_code=500,
-            detail=f"OCR processing failed: {exc}",
+            detail=(
+                "OCR processing failed. Check that Tesseract and Poppler are "
+                "installed and that the uploaded PDF is valid."
+            ),
         ) from exc
     finally:
         cleanup_file(temp_path)
@@ -194,7 +191,7 @@ async def process_document(
             structured_output = llm_result["structured_output"]
             llm_message = llm_result["message"]
             saved_files.update(
-                save_structured_output(document_folder, structured_output)
+                save_output_json(document_folder, structured_output)
             )
         except Exception as exc:
             llm_message = f"LLM processing failed: {exc}"
