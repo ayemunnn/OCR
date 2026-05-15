@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -12,6 +12,7 @@ class Document(Base):
     __tablename__ = "documents"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     document_id: Mapped[str] = mapped_column(String, unique=True, index=True)
     original_filename: Mapped[str] = mapped_column(String)
     storage_folder: Mapped[str] = mapped_column(String)
@@ -29,3 +30,5 @@ class Document(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
     )
+
+    user = relationship("User", back_populates="documents")

@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 
 from ..db.session import get_db
 from ..models.document import Document
+from ..models.user import User
 from ..schemas.document import DocumentListResponse, DocumentResponse
+from .auth import get_current_user
 from ..services.llm_service import analyze_document_text
 from ..services.ocr_service import extract_text_from_images
 from ..services.pdf_service import (
@@ -25,27 +27,50 @@ from ..services.storage_service import (
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
-def get_document_or_404(document_id: str, db: Session) -> Document:
-    document = db.query(Document).filter(Document.document_id == document_id).first()
+def get_document_or_404(document_id: str, current_user: User, db: Session) -> Document:
+    document = (
+        db.query(Document)
+        .filter(
+            Document.document_id == document_id,
+            Document.user_id == current_user.id,
+        )
+        .first()
+    )
     if not document:
         raise HTTPException(status_code=404, detail="Document not found.")
     return document
 
 
 @router.get("", response_model=DocumentListResponse)
-def list_documents(db: Session = Depends(get_db)):
-    documents = db.query(Document).order_by(Document.created_at.desc()).all()
+def list_documents(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    documents = (
+        db.query(Document)
+        .filter(Document.user_id == current_user.id)
+        .order_by(Document.created_at.desc())
+        .all()
+    )
     return {"documents": documents}
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
-def get_document(document_id: str, db: Session = Depends(get_db)):
-    return get_document_or_404(document_id, db)
+def get_document(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return get_document_or_404(document_id, current_user, db)
 
 
 @router.get("/{document_id}/text")
-def get_document_text(document_id: str, db: Session = Depends(get_db)):
-    document = get_document_or_404(document_id, db)
+def get_document_text(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    document = get_document_or_404(document_id, current_user, db)
     if not document.extracted_text_path:
         raise HTTPException(status_code=404, detail="Extracted text file not found.")
 
@@ -61,8 +86,12 @@ def get_document_text(document_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{document_id}/json")
-def get_document_json(document_id: str, db: Session = Depends(get_db)):
-    document = get_document_or_404(document_id, db)
+def get_document_json(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    document = get_document_or_404(document_id, current_user, db)
     if not document.output_json_path:
         raise HTTPException(status_code=404, detail="Output JSON file not found.")
 
@@ -88,6 +117,7 @@ def get_document_json(document_id: str, db: Session = Depends(get_db)):
 @router.post("/process")
 async def process_document(
     file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     temp_path = None
@@ -106,6 +136,7 @@ async def process_document(
             return
 
         document = Document(
+            user_id=current_user.id,
             document_id=document_id,
             original_filename=file.filename or "",
             storage_folder=document_folder,

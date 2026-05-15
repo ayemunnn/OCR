@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 class DocumentResponse(BaseModel):
     id: int
+    user_id: int
     document_id: str
     original_filename: str
     storage_folder: str

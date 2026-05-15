@@ -46,3 +46,7 @@ If `HF_API_KEY` is not configured, the endpoint still runs OCR and returns:
 ```text
 LLM processing skipped because API key is not configured.
 ```
+
+### Local SQLite schema changes
+
+This project does not use Alembic yet. During local development, if a model change adds columns or tables and the backend fails because the existing SQLite schema is stale, stop the backend and delete `backend/papersleuth.db`. The app will recreate the local database on startup.
