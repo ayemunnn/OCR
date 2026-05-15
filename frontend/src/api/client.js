@@ -59,3 +59,27 @@ export function getDocuments(token) {
     },
   });
 }
+
+export function getDocument(documentId, token) {
+  return request(`/documents/${documentId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export function getDocumentText(documentId, token) {
+  return request(`/documents/${documentId}/text`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export function getDocumentJson(documentId, token) {
+  return request(`/documents/${documentId}/json`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
