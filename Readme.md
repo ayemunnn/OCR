@@ -52,3 +52,13 @@ LLM processing skipped because API key is not configured.
 ### Local SQLite schema changes
 
 This project does not use Alembic yet. During local development, if a model change adds columns or tables and the backend fails because the existing SQLite schema is stale, stop the backend and delete `backend/papersleuth.db`. The app will recreate the local database on startup.
+
+## Frontend Development
+
+The React frontend expects the FastAPI backend to be running at `http://127.0.0.1:8000`.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
