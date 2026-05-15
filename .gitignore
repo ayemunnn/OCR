@@ -6,3 +6,5 @@ __pycache__/
 *.log
 .DS_Store
 .vscode/
+backend/storage/
+backend/papersleuth.db
