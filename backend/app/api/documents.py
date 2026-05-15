@@ -208,6 +208,7 @@ async def process_document(
         "status": llm_message,
         "document_id": document_id,
         "extracted_text_preview": extracted_text[:1000],
-        "structured_output": structured_output,
-        "saved_files": saved_files,
+        "has_extracted_text": bool(saved_path("extracted_text")),
+        "has_output_json": bool(saved_path("structured_output")),
+        "message": llm_message,
     }
