@@ -29,17 +29,18 @@ function DocumentUpload({ token, onUploaded }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <h2>Upload document</h2>
+    <form className="form-stack" onSubmit={handleSubmit}>
+      <h2>Upload panel</h2>
       <input
+        className="file-input"
         type="file"
         accept="application/pdf,.pdf"
         onChange={(event) => setFile(event.target.files?.[0] || null)}
       />
-      <button type="submit" disabled={isUploading}>
+      <button className="primary-button" type="submit" disabled={isUploading}>
         {isUploading ? "Uploading..." : "Upload PDF"}
       </button>
-      {message && <p>{message}</p>}
+      {message && <p className="message">{message}</p>}
     </form>
   );
 }

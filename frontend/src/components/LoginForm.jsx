@@ -24,7 +24,7 @@ function LoginForm({ onLogin }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form className="form-stack" onSubmit={handleSubmit}>
       <h2>Log in</h2>
       <label>
         Email
@@ -44,10 +44,10 @@ function LoginForm({ onLogin }) {
           required
         />
       </label>
-      <button type="submit" disabled={isSubmitting}>
+      <button className="primary-button" type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Logging in..." : "Log in"}
       </button>
-      {message && <p>{message}</p>}
+      {message && <p className="error-message">{message}</p>}
     </form>
   );
 }

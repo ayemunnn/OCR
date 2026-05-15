@@ -1,0 +1,181 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f5f7fb;
+  color: #1f2937;
+  font-family: Arial, sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-header {
+  align-items: center;
+  background: #ffffff;
+  border-bottom: 1px solid #dde3ee;
+  display: flex;
+  justify-content: space-between;
+  padding: 20px 32px;
+}
+
+.app-header h1 {
+  font-size: 28px;
+  margin: 0;
+}
+
+.app-header p {
+  color: #5b6472;
+  margin: 4px 0 0;
+}
+
+.app-main {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 24px;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #dde3ee;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.panel + .panel {
+  margin-top: 20px;
+}
+
+.auth-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.stack {
+  display: grid;
+  gap: 20px;
+}
+
+.form-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.form-stack label {
+  display: grid;
+  gap: 6px;
+}
+
+.form-stack input,
+.file-input {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.primary-button,
+.secondary-button {
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+
+.primary-button {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.secondary-button {
+  background: #e8edf5;
+  color: #1f2937;
+}
+
+.message {
+  color: #475569;
+  margin: 10px 0 0;
+}
+
+.error-message {
+  color: #b42318;
+}
+
+.document-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.document-table th,
+.document-table td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 10px 8px;
+  vertical-align: top;
+}
+
+.document-table th {
+  color: #475569;
+  font-size: 14px;
+}
+
+.document-id {
+  color: #64748b;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.pill {
+  background: #eef2ff;
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.detail-pre {
+  background: #0f172a;
+  border-radius: 6px;
+  color: #e5e7eb;
+  max-height: 420px;
+  overflow: auto;
+  padding: 14px;
+  white-space: pre-wrap;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+@media (max-width: 820px) {
+  .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .app-main {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+}
