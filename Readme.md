@@ -81,11 +81,13 @@ If `HF_API_KEY` is not configured, the backend still runs OCR and reports that L
 
 Docker is optional. The normal Miniconda workflow remains supported.
 
-Build and run the backend with SQLite:
+Build and run the backend and frontend together with SQLite:
 
 ```bash
-docker compose up --build backend
+docker compose up --build
 ```
+
+Open the frontend at `http://127.0.0.1:5173` and the backend API docs at `http://127.0.0.1:8000/docs`.
 
 Run the optional PostgreSQL service for local experimentation:
 
@@ -106,6 +108,24 @@ backend/papersleuth.db
 ```
 
 The app will recreate the local database on startup.
+
+## Storage Providers
+
+Local filesystem storage is the default and writes processed files under `backend/storage/`.
+
+```text
+STORAGE_PROVIDER=local
+```
+
+Azure Blob Storage can be enabled later without changing the document API:
+
+```text
+STORAGE_PROVIDER=azure
+AZURE_STORAGE_CONNECTION_STRING=<your Azure connection string>
+AZURE_STORAGE_CONTAINER_NAME=papersleuth-documents
+```
+
+Do not commit real Azure credentials. If `STORAGE_PROVIDER=azure` is set without a connection string, the backend returns a clear configuration error.
 
 ## Ignored Local Files
 

@@ -14,6 +14,20 @@ services:
       - backend_sqlite:/data
       - ./backend/storage:/app/storage
 
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://127.0.0.1:8000
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+
   postgres:
     image: postgres:16
     profiles:
@@ -29,4 +43,5 @@ services:
 
 volumes:
   backend_sqlite:
+  frontend_node_modules:
   postgres_data:

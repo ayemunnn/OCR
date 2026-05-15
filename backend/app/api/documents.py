@@ -17,6 +17,8 @@ from ..services.pdf_service import (
     validate_pdf_filename,
 )
 from ..services.storage_service import (
+    AzureStorageConfigurationError,
+    UnsupportedStorageProviderError,
     create_document_folder,
     read_extracted_text,
     read_output_json,
@@ -76,6 +78,8 @@ def get_document_text(
         text = read_extracted_text(document.extracted_text_path)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Extracted text file not found.")
+    except (AzureStorageConfigurationError, UnsupportedStorageProviderError) as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return {
         "document_id": document.document_id,
@@ -95,6 +99,8 @@ def get_document_json(
         output = read_output_json(document.output_json_path)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Output JSON file not found.")
+    except (AzureStorageConfigurationError, UnsupportedStorageProviderError) as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     except json.JSONDecodeError as exc:
         raise HTTPException(
             status_code=500,
@@ -171,6 +177,8 @@ async def process_document(
         raise
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (AzureStorageConfigurationError, UnsupportedStorageProviderError) as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     except Exception as exc:
         save_document_record("failed", str(exc))
         raise HTTPException(

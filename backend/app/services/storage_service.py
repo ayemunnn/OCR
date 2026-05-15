@@ -3,8 +3,24 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from ..core.config import get_settings
+from .azure_storage_service import AzureStorageConfigurationError
+
 
 STORAGE_ROOT = Path(__file__).resolve().parents[2] / "storage"
+
+
+class UnsupportedStorageProviderError(RuntimeError):
+    pass
+
+
+def _get_storage_provider() -> str:
+    provider = get_settings().storage_provider.lower().strip()
+    if provider not in {"local", "azure"}:
+        raise UnsupportedStorageProviderError(
+            f"Unsupported storage provider '{provider}'. Use 'local' or 'azure'."
+        )
+    return provider
 
 
 def ensure_storage_root(storage_root: Path = STORAGE_ROOT) -> Path:
@@ -13,8 +29,15 @@ def ensure_storage_root(storage_root: Path = STORAGE_ROOT) -> Path:
 
 
 def create_document_folder(storage_root: Path = STORAGE_ROOT) -> dict[str, Any]:
-    root = ensure_storage_root(storage_root)
     document_id = uuid.uuid4().hex
+
+    if _get_storage_provider() == "azure":
+        return {
+            "document_id": document_id,
+            "folder_path": document_id,
+        }
+
+    root = ensure_storage_root(storage_root)
     document_folder = root / document_id
     document_folder.mkdir(parents=True, exist_ok=False)
 
@@ -29,7 +52,6 @@ def save_upload(
     filename: str,
     file_bytes: bytes,
 ) -> dict[str, Any]:
-    # TODO: Add an Azure Blob implementation behind this helper later.
     return save_original_pdf(document_folder, filename, file_bytes)
 
 
@@ -38,6 +60,15 @@ def save_original_pdf(
     filename: str,
     file_bytes: bytes,
 ) -> dict[str, Any]:
+    if _get_storage_provider() == "azure":
+        from . import azure_storage_service
+
+        return azure_storage_service.save_original_pdf(
+            str(document_folder),
+            filename,
+            file_bytes,
+        )
+
     safe_filename = Path(filename).name or "uploaded.pdf"
     destination = Path(document_folder) / safe_filename
     destination.write_bytes(file_bytes)
@@ -52,7 +83,14 @@ def save_original_pdf(
 
 
 def save_extracted_text(document_folder: str | Path, extracted_text: str) -> dict[str, Any]:
-    # TODO: Add an Azure Blob implementation behind this helper later.
+    if _get_storage_provider() == "azure":
+        from . import azure_storage_service
+
+        return azure_storage_service.save_extracted_text(
+            str(document_folder),
+            extracted_text,
+        )
+
     destination = Path(document_folder) / "extracted_text.txt"
     destination.write_text(extracted_text, encoding="utf-8")
 
@@ -69,7 +107,6 @@ def save_output_json(
     document_folder: str | Path,
     structured_output: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    # TODO: Add an Azure Blob implementation behind this helper later.
     return save_structured_output(document_folder, structured_output)
 
 
@@ -79,6 +116,14 @@ def save_structured_output(
 ) -> dict[str, Any]:
     if not structured_output:
         return {}
+
+    if _get_storage_provider() == "azure":
+        from . import azure_storage_service
+
+        return azure_storage_service.save_output_json(
+            str(document_folder),
+            structured_output,
+        )
 
     destination = Path(document_folder) / "output.json"
     destination.write_text(
@@ -96,7 +141,11 @@ def save_structured_output(
 
 
 def read_extracted_text(path: str | Path | None) -> str:
-    # TODO: Add an Azure Blob implementation behind this helper later.
+    if _get_storage_provider() == "azure":
+        from . import azure_storage_service
+
+        return azure_storage_service.read_extracted_text(str(path) if path else None)
+
     if not path:
         raise FileNotFoundError("Extracted text file is not available.")
 
@@ -108,7 +157,11 @@ def read_extracted_text(path: str | Path | None) -> str:
 
 
 def read_output_json(path: str | Path | None) -> dict[str, Any]:
-    # TODO: Add an Azure Blob implementation behind this helper later.
+    if _get_storage_provider() == "azure":
+        from . import azure_storage_service
+
+        return azure_storage_service.read_output_json(str(path) if path else None)
+
     if not path:
         raise FileNotFoundError("Output JSON file is not available.")
 
