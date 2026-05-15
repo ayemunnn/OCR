@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     hf_api_key: str | None = None
     hf_model_name: str = "google/gemma-3-27b-it"
     database_url: str = DEFAULT_DATABASE_URL
+    secret_key: str = "change-this-secret-key-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60
 
     model_config = SettingsConfigDict(
         env_file=("backend/.env", "../.env", ".env"),

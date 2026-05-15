@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from .api.auth import router as auth_router
 from .api.documents import router as documents_router
 from .db.init_db import init_db
 
@@ -19,6 +20,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(auth_router)
 app.include_router(documents_router)
 
 
