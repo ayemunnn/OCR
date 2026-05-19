@@ -8,7 +8,7 @@ The original Streamlit app, `paperSleuth.py`, is preserved during the migration 
 
 - FastAPI backend with health, auth, document processing, and document history endpoints.
 - JWT authentication with signup, login, and `/auth/me`.
-- User-owned document records stored in SQLite.
+- User-owned document records stored in SQLite for direct local runs or PostgreSQL through Docker Compose.
 - Local file storage under `backend/storage/` for uploaded PDFs, OCR text, and JSON output.
 - React/Vite frontend for signup, login, PDF upload, history, extracted text, and JSON viewing.
 - CORS configured for local frontend development.
@@ -112,6 +112,12 @@ Open the frontend at `http://127.0.0.1:5173` and the backend API docs at `http:/
 
 The Docker backend uses PostgreSQL with local development credentials from `docker-compose.yml`. These credentials are not production secrets.
 
+Apply database migrations to the Docker PostgreSQL database:
+
+```bash
+docker compose exec backend alembic -c alembic.ini upgrade head
+```
+
 Stop the stack:
 
 ```bash
@@ -144,6 +150,8 @@ alembic -c alembic.ini revision --autogenerate -m "describe change"
 
 Then review the generated migration before applying it.
 
+Alembic is preferred for schema changes going forward. The old `init_db()` startup hook is kept as a no-op compatibility shim and does not create tables.
+
 If your existing local SQLite database was created before Alembic was added, stop the backend, delete:
 
 ```text
@@ -157,14 +165,18 @@ cd backend
 alembic -c alembic.ini upgrade head
 ```
 
-Docker runs migrations automatically before starting the backend.
+Docker does not run migrations automatically. After starting the Docker stack, run:
+
+```bash
+docker compose exec backend alembic -c alembic.ini upgrade head
+```
 
 ## PostgreSQL Readiness
 
 SQLite remains the default for direct Miniconda/local development. Docker Compose uses PostgreSQL to match production-style database usage. You can also run the backend directly against PostgreSQL by setting `DATABASE_URL`, for example:
 
 ```text
-DATABASE_URL=postgresql+psycopg2://papersleuth:papersleuth_password@localhost:5432/papersleuth
+DATABASE_URL=postgresql+psycopg2://<username>:<password>@localhost:5432/<database_name>
 ```
 
 Then run Alembic against that `DATABASE_URL` before starting the backend.
