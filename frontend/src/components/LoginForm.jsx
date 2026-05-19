@@ -25,7 +25,7 @@ function LoginForm({ onLogin }) {
 
   return (
     <form className="form-stack" onSubmit={handleSubmit}>
-      <h2>Log in</h2>
+      <h3>Log in</h3>
       <label>
         Email
         <input

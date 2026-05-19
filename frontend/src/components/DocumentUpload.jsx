@@ -20,7 +20,7 @@ function DocumentUpload({ token, onUploaded }) {
     try {
       const result = await uploadDocument({ token, file });
       setMessage(result.message || result.status || "Document uploaded.");
-      onUploaded();
+      onUploaded(result);
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -30,17 +30,28 @@ function DocumentUpload({ token, onUploaded }) {
 
   return (
     <form className="form-stack" onSubmit={handleSubmit}>
-      <h2>Upload panel</h2>
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">Process</span>
+          <h2>Upload PDF</h2>
+        </div>
+      </div>
       <input
         className="file-input"
         type="file"
         accept="application/pdf,.pdf"
         onChange={(event) => setFile(event.target.files?.[0] || null)}
       />
+      {file && (
+        <div className="file-summary">
+          <strong>{file.name}</strong>
+          <span>{Math.max(1, Math.round(file.size / 1024))} KB</span>
+        </div>
+      )}
       <button className="primary-button" type="submit" disabled={isUploading}>
-        {isUploading ? "Uploading..." : "Upload PDF"}
+        {isUploading ? "Processing..." : "Upload and process"}
       </button>
-      {message && <p className="message">{message}</p>}
+      {message && <p className="notice-message">{message}</p>}
     </form>
   );
 }

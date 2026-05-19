@@ -27,7 +27,7 @@ function SignupForm({ onSignup }) {
 
   return (
     <form className="form-stack" onSubmit={handleSubmit}>
-      <h2>Sign up</h2>
+      <h3>Create account</h3>
       <label>
         Email
         <input
@@ -55,7 +55,7 @@ function SignupForm({ onSignup }) {
         />
       </label>
       <button className="primary-button" type="submit" disabled={isSubmitting}>
-        {isSubmitting ? "Signing up..." : "Sign up"}
+        {isSubmitting ? "Creating..." : "Create account"}
       </button>
       {message && <p className="message">{message}</p>}
     </form>

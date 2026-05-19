@@ -2,6 +2,13 @@ import React, { useEffect, useState } from "react";
 
 import { getDocumentJson, getDocumentText } from "../api/client";
 
+function formatDate(value) {
+  if (!value) {
+    return "Unknown";
+  }
+  return new Date(value).toLocaleString();
+}
+
 function DocumentDetail({ document, token }) {
   const [content, setContent] = useState("");
   const [contentType, setContentType] = useState("");
@@ -58,30 +65,48 @@ function DocumentDetail({ document, token }) {
 
   if (!document) {
     return (
-      <div>
-        <h2>Selected document detail panel</h2>
-        <p>Select a document to view metadata, extracted text, or JSON output.</p>
+      <div className="empty-state detail-empty">
+        <span className="eyebrow">Details</span>
+        <h2>Select a document</h2>
+        <p>Choose a processed PDF from the history panel to view metadata, extracted text, or JSON output.</p>
       </div>
     );
   }
 
   return (
     <div>
-      <h2>Selected document detail panel</h2>
-      <p>
-        <strong>{document.original_filename}</strong>
-      </p>
-      <p>Status: {document.status}</p>
-      <p>Created: {new Date(document.created_at).toLocaleString()}</p>
-      <p>Document ID: {document.document_id}</p>
-      <p>
-        <span className="pill">
-          Text: {document.has_extracted_text ? "available" : "not available"}
-        </span>{" "}
-        <span className="pill">
-          JSON: {document.has_output_json ? "available" : "not available"}
-        </span>
-      </p>
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">Details</span>
+          <h2>{document.original_filename}</h2>
+        </div>
+      </div>
+
+      <dl className="metadata-grid">
+        <div>
+          <dt>Status</dt>
+          <dd>{document.status}</dd>
+        </div>
+        <div>
+          <dt>Created</dt>
+          <dd>{formatDate(document.created_at)}</dd>
+        </div>
+        <div>
+          <dt>Document ID</dt>
+          <dd className="document-id">{document.document_id}</dd>
+        </div>
+        <div>
+          <dt>Outputs</dt>
+          <dd>
+            <span className={document.has_extracted_text ? "pill good" : "pill muted"}>
+              Text {document.has_extracted_text ? "available" : "missing"}
+            </span>
+            <span className={document.has_output_json ? "pill good" : "pill muted"}>
+              JSON {document.has_output_json ? "available" : "missing"}
+            </span>
+          </dd>
+        </div>
+      </dl>
 
       <div className="detail-actions">
         <button
@@ -105,10 +130,12 @@ function DocumentDetail({ document, token }) {
       {isLoading && <p>Loading document details...</p>}
       {message && <p className="error-message">{message}</p>}
       {content && (
-        <>
-          <h3>{contentType}</h3>
+        <div className="output-panel">
+          <div className="output-heading">
+            <h3>{contentType}</h3>
+          </div>
           <pre className="detail-pre">{content}</pre>
-        </>
+        </div>
       )}
     </div>
   );

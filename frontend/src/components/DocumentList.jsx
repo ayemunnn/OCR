@@ -2,6 +2,13 @@ import React, { useEffect, useState } from "react";
 
 import { getDocuments } from "../api/client";
 
+function formatDate(value) {
+  if (!value) {
+    return "Unknown";
+  }
+  return new Date(value).toLocaleString();
+}
+
 function DocumentList({ token, refreshKey, selectedDocumentId, onSelectDocument }) {
   const [documents, setDocuments] = useState([]);
   const [message, setMessage] = useState("");
@@ -30,45 +37,50 @@ function DocumentList({ token, refreshKey, selectedDocumentId, onSelectDocument 
 
   return (
     <div>
-      <h2>Document history panel</h2>
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">Library</span>
+          <h2>Document history</h2>
+        </div>
+        <span className="count-badge">{documents.length}</span>
+      </div>
       {isLoading && <p>Loading documents...</p>}
       {message && <p className="error-message">{message}</p>}
-      {!isLoading && documents.length === 0 && <p>No documents processed yet.</p>}
+      {!isLoading && documents.length === 0 && (
+        <div className="empty-state">
+          <h3>No documents yet</h3>
+          <p>Upload your first PDF to see OCR text, JSON output, and processing status here.</p>
+        </div>
+      )}
       {documents.length > 0 && (
-        <table className="document-table">
-          <thead>
-            <tr>
-              <th align="left">Filename</th>
-              <th align="left">Status</th>
-              <th align="left">Created</th>
-              <th align="left">Text</th>
-              <th align="left">JSON</th>
-              <th align="left">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {documents.map((document) => (
-              <tr key={document.document_id}>
-                <td>{document.original_filename}</td>
-                <td>{document.status}</td>
-                <td>{new Date(document.created_at).toLocaleString()}</td>
-                <td>{document.has_extracted_text ? "Yes" : "No"}</td>
-                <td>{document.has_output_json ? "Yes" : "No"}</td>
-                <td>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => onSelectDocument(document)}
-                    disabled={selectedDocumentId === document.document_id}
-                  >
-                    {selectedDocumentId === document.document_id ? "Selected" : "Select"}
-                  </button>
-                  <div className="document-id">{document.document_id}</div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="document-list">
+          {documents.map((document) => {
+            const isSelected = selectedDocumentId === document.document_id;
+            return (
+              <button
+                className={`document-row ${isSelected ? "is-selected" : ""}`}
+                key={document.document_id}
+                type="button"
+                onClick={() => onSelectDocument(document)}
+              >
+                <span className="document-main">
+                  <strong>{document.original_filename}</strong>
+                  <span>{formatDate(document.created_at)}</span>
+                  <span className="document-id">{document.document_id}</span>
+                </span>
+                <span className="document-meta">
+                  <span className="status-pill">{document.status}</span>
+                  <span className={document.has_extracted_text ? "pill good" : "pill muted"}>
+                    Text
+                  </span>
+                  <span className={document.has_output_json ? "pill good" : "pill muted"}>
+                    JSON
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );
