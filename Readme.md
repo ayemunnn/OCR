@@ -78,11 +78,31 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 If `HF_API_KEY` is not configured, the backend still runs OCR and reports that LLM processing was skipped.
 
+## Optional LLM Setup
+
+PaperSleuth can process PDFs in OCR-only mode. To enable LLM cleanup and JSON extraction, provide a Hugging Face token through environment variables.
+
+For direct Miniconda/local backend runs, copy `backend/.env.example` to `backend/.env` and set:
+
+```env
+HF_API_KEY=your_hugging_face_token_here
+HF_MODEL_NAME=google/gemma-3-27b-it
+```
+
+For Docker Compose runs, set the variable in your shell before starting the stack:
+
+```powershell
+$env:HF_API_KEY="your_hugging_face_token_here"
+docker compose up --build
+```
+
+Do not commit real API keys. If `HF_API_KEY` is blank, uploads still complete with OCR text and the response will say that LLM processing was skipped.
+
 ## Docker Workflow
 
 Docker is optional. The normal Miniconda workflow remains supported.
 
-Build and run the backend and frontend together with SQLite:
+Build and run the backend, frontend, and PostgreSQL together:
 
 ```bash
 docker compose up --build
@@ -90,13 +110,21 @@ docker compose up --build
 
 Open the frontend at `http://127.0.0.1:5173` and the backend API docs at `http://127.0.0.1:8000/docs`.
 
-Run the optional PostgreSQL service for local experimentation:
+The Docker backend uses PostgreSQL with local development credentials from `docker-compose.yml`. These credentials are not production secrets.
+
+Stop the stack:
 
 ```bash
-docker compose --profile postgres up postgres
+docker compose down
 ```
 
-To use PostgreSQL with the backend, set `DATABASE_URL` to a PostgreSQL URL before starting the backend. SQLite remains the default for local development.
+Reset the local Docker PostgreSQL database volume:
+
+```bash
+docker compose down -v
+```
+
+Direct Miniconda/local backend runs still use SQLite unless `DATABASE_URL` is set.
 
 ## Database Migrations
 
@@ -133,16 +161,10 @@ Docker runs migrations automatically before starting the backend.
 
 ## PostgreSQL Readiness
 
-SQLite remains the default for local development. PostgreSQL can be tested locally by setting `DATABASE_URL` to a PostgreSQL connection string, for example:
+SQLite remains the default for direct Miniconda/local development. Docker Compose uses PostgreSQL to match production-style database usage. You can also run the backend directly against PostgreSQL by setting `DATABASE_URL`, for example:
 
 ```text
-DATABASE_URL=postgresql://papersleuth:papersleuth_dev_password@localhost:5432/papersleuth
-```
-
-Start the optional PostgreSQL service with:
-
-```bash
-docker compose --profile postgres up postgres
+DATABASE_URL=postgresql+psycopg2://papersleuth:papersleuth_password@localhost:5432/papersleuth
 ```
 
 Then run Alembic against that `DATABASE_URL` before starting the backend.
