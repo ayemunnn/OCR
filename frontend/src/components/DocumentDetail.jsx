@@ -9,6 +9,14 @@ function formatDate(value) {
   return new Date(value).toLocaleString();
 }
 
+function buildJsonFilename(document) {
+  const baseName = document.original_filename
+    .replace(/\.pdf$/i, "")
+    .replace(/[^a-z0-9-_]+/gi, "_")
+    .replace(/^_+|_+$/g, "");
+  return `${baseName || document.document_id || "papersleuth_output"}.json`;
+}
+
 function DocumentDetail({ document, token }) {
   const [content, setContent] = useState("");
   const [contentType, setContentType] = useState("");
@@ -58,6 +66,34 @@ function DocumentDetail({ document, token }) {
       setContentType("JSON output");
     } catch (error) {
       setMessage(error.message || "No JSON output is available.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleDownloadJson() {
+    if (!document) {
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage("");
+
+    try {
+      const data = await getDocumentJson(document.document_id, token);
+      const jsonText = JSON.stringify(data.output, null, 2);
+      const blob = new Blob([jsonText], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = buildJsonFilename(document);
+      window.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setMessage("JSON file downloaded.");
+    } catch (error) {
+      setMessage(error.message || "No JSON output is available to download.");
     } finally {
       setIsLoading(false);
     }
@@ -124,6 +160,14 @@ function DocumentDetail({ document, token }) {
           disabled={!document.has_output_json || isLoading}
         >
           View JSON output
+        </button>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={handleDownloadJson}
+          disabled={!document.has_output_json || isLoading}
+        >
+          Download JSON
         </button>
       </div>
 

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 
 import { signup } from "../api/client";
 
-function SignupForm({ onSignup }) {
+function SignupForm({ onSignup, onSwitchToLogin }) {
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +27,10 @@ function SignupForm({ onSignup }) {
 
   return (
     <form className="form-stack" onSubmit={handleSubmit}>
-      <h3>Create account</h3>
+      <div className="auth-copy">
+        <h2>Create your account</h2>
+        <p>Start extracting and organizing scanned PDFs with PaperSleuth.</p>
+      </div>
       <label>
         Email
         <input
@@ -58,6 +61,12 @@ function SignupForm({ onSignup }) {
         {isSubmitting ? "Creating..." : "Create account"}
       </button>
       {message && <p className="message">{message}</p>}
+      <p className="auth-switch">
+        Already have an account?{" "}
+        <button type="button" onClick={onSwitchToLogin}>
+          Log in
+        </button>
+      </p>
     </form>
   );
 }

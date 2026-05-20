@@ -1,96 +1,106 @@
 # PaperSleuth Azure Deployment Plan
 
-## Target Architecture
+This document prepares PaperSleuth for Azure deployment. It is planning and configuration guidance only; it does not deploy anything.
 
-PaperSleuth is moving from a local Streamlit OCR app toward a SaaS architecture with a FastAPI backend and React frontend.
+## Recommended Azure Architecture
 
-Recommended Azure target:
+PaperSleuth should deploy as separate frontend, backend, database, and storage services:
 
-- Backend API: Azure App Service or Azure Container Apps.
-- Frontend: Azure Static Web Apps.
+- Frontend: Azure Static Web Apps for the React/Vite app.
+- Backend: Azure Container Apps or Azure App Service for the FastAPI API.
 - Database: Azure Database for PostgreSQL.
-- File storage: Azure Blob Storage for uploaded PDFs, extracted text, and JSON output.
-- Secrets/configuration: Azure App Settings for basic configuration, with Azure Key Vault for production secrets when ready.
+- File storage: Azure Blob Storage for uploaded PDFs, extracted OCR text, and JSON outputs.
+- Secrets/configuration: Azure App Settings for environment variables, with Azure Key Vault for production secrets when ready.
+- Container image: Azure Container Registry if using Azure Container Apps or custom-container App Service.
 
-## Backend Runtime
+Azure Container Apps is a strong backend target because the backend needs OCR system dependencies such as Tesseract and Poppler. Azure App Service is also possible, but verify OCR dependency support before choosing a non-container deployment.
 
-The backend currently runs FastAPI with local SQLite and local filesystem storage. For Azure, the backend should run with:
+## Production Environment Variables
 
-- Python 3.11.
-- Tesseract OCR installed.
-- Poppler installed for PDF conversion.
-- Environment variables configured in Azure App Settings or Container Apps secrets.
+### Backend
 
-If using Azure Container Apps, the backend Dockerfile can carry OCR system dependencies. If using App Service without a custom container, confirm Tesseract and Poppler availability first.
-
-## Frontend Runtime
-
-The React/Vite frontend can be built and deployed to Azure Static Web Apps.
-
-The frontend should set:
+Configure these values in Azure App Settings, Container Apps secrets, or Key Vault references. Do not commit production values to the repository.
 
 ```text
-VITE_API_BASE_URL=https://<backend-hostname>
-```
-
-## Database
-
-SQLite is only for local development.
-
-For Azure, use Azure Database for PostgreSQL and configure:
-
-```text
-DATABASE_URL=postgresql://<user>:<password>@<host>:5432/<database>
-```
-
-Do not commit production database credentials.
-
-## Storage
-
-Local storage currently writes files under `backend/storage/`.
-
-Azure Blob Storage should later replace the local storage implementation behind `backend/app/services/storage_service.py`.
-
-Future storage settings:
-
-```text
+APP_NAME=PaperSleuth
+APP_ENV=production
+APP_DEBUG=false
+DATABASE_URL=postgresql+psycopg2://<username>:<password>@<host>:5432/<database_name>
+SECRET_KEY=<strong-production-secret>
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+BACKEND_CORS_ORIGINS=["https://<frontend-domain>"]
 STORAGE_PROVIDER=azure
-AZURE_STORAGE_CONNECTION_STRING=<from Azure>
+AZURE_STORAGE_CONNECTION_STRING=<azure-storage-connection-string>
 AZURE_STORAGE_CONTAINER_NAME=papersleuth-documents
+HF_API_KEY=<hugging-face-token-if-used>
+LLM_API_KEY=<generic-llm-token-if-provider-changes>
+HF_MODEL_NAME=google/gemma-3-27b-it
 ```
 
-Do not commit Azure connection strings.
+Notes:
 
-## Required Environment Variables
+- `DATABASE_URL` should point to Azure Database for PostgreSQL in production.
+- `SECRET_KEY` must be changed from the local default before deployment.
+- `BACKEND_CORS_ORIGINS` should include only the deployed frontend URL.
+- Use either `HF_API_KEY` for the current Hugging Face integration or a future `LLM_API_KEY` if the provider changes.
+
+### Frontend
+
+Configure this during the Azure Static Web Apps build/deploy process:
 
 ```text
-DATABASE_URL
-SECRET_KEY
-ALGORITHM
-ACCESS_TOKEN_EXPIRE_MINUTES
-BACKEND_CORS_ORIGINS
-STORAGE_PROVIDER
-AZURE_STORAGE_CONNECTION_STRING
-AZURE_STORAGE_CONTAINER_NAME
-HF_API_KEY
-HF_MODEL_NAME
-LLM_API_KEY
+VITE_API_BASE_URL=https://<backend-api-domain>
 ```
 
-`HF_API_KEY` is used by the current Hugging Face integration. `LLM_API_KEY` is reserved as a generic future name if the LLM provider changes.
+## Deployment Checklist
 
-## Migration Steps
+1. Create an Azure Resource Group.
+2. Create Azure Database for PostgreSQL.
+3. Create an Azure Storage Account.
+4. Create a Blob container for PaperSleuth documents.
+5. Create Azure Container Registry if deploying the backend as a container.
+6. Build and publish the backend container image if using Container Apps.
+7. Create the backend hosting service with Azure Container Apps or Azure App Service.
+8. Set backend environment variables in App Settings, Container Apps secrets, or Key Vault references.
+9. Run Alembic migrations against the production PostgreSQL database.
+10. Deploy the backend.
+11. Deploy the frontend to Azure Static Web Apps.
+12. Set `VITE_API_BASE_URL` to the backend API URL.
+13. Restrict backend CORS to the production frontend URL.
+14. Test signup, login, PDF upload, document history, extracted text, and JSON output.
 
-1. Keep the local SQLite and filesystem workflow stable.
-2. Add Alembic migrations before relying on PostgreSQL in shared environments.
-3. Add an Azure Blob implementation behind the storage service helpers.
-4. Deploy the backend with environment variables and OCR system dependencies.
-5. Deploy the frontend with `VITE_API_BASE_URL` pointing to the backend.
-6. Run an end-to-end test: signup, login, upload PDF, view document history, view extracted text, view JSON output.
+## Database Migrations
+
+PaperSleuth uses Alembic for schema migrations.
+
+Before deploying the backend against a new Azure PostgreSQL database, run:
+
+```bash
+cd backend
+alembic -c alembic.ini upgrade head
+```
+
+For hosted environments, run migrations from a trusted deployment shell, release job, or temporary admin environment that has the production `DATABASE_URL` configured. Do not rely on deleting databases or resetting schemas in production.
+
+## Local vs Production
+
+- SQLite is a local-only fallback for direct Miniconda development.
+- PostgreSQL should be used in production.
+- Local filesystem storage under `backend/storage/` is for development only.
+- Azure Blob Storage should be used in production.
+- `.env` files must not be committed.
+- `backend/.env.example` should contain placeholders only, never real credentials.
+- Docker Compose values are development-only and should not be reused as production secrets.
 
 ## Security Notes
 
-- Replace the default `SECRET_KEY` before any hosted deployment.
-- Store secrets in Azure App Settings or Key Vault.
-- Do not commit `.env`, database files, storage files, or Azure credentials.
-- Add HTTPS-only production CORS origins before exposing the API publicly.
+- Never use the default `SECRET_KEY` in production.
+- Do not commit `.env` files, database files, uploaded PDFs, generated outputs, API keys, or Azure credentials.
+- Use a strong database password and rotate it if it is ever exposed.
+- Restrict `BACKEND_CORS_ORIGINS` to the production frontend URL.
+- Use HTTPS only in production.
+- Store secrets in Azure App Settings or Azure Key Vault.
+- Prefer Key Vault references for database passwords, storage connection strings, JWT secrets, and LLM API keys.
+- Confirm Azure Blob containers are not public unless there is a deliberate product requirement.
+- Review logs to ensure OCR text, document contents, and secrets are not accidentally logged.

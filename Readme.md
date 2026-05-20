@@ -210,18 +210,12 @@ These should not be committed:
 
 Use `.env.example` files only for documenting configuration.
 
-## Azure Readiness
+## Azure Deployment
 
-See:
+Azure deployment is not automated yet. Before deploying, review:
 
 ```text
 docs/AZURE_DEPLOYMENT_PLAN.md
 ```
 
-Planned Azure services:
-
-- Azure App Service or Azure Container Apps for the backend.
-- Azure Static Web Apps for the frontend.
-- Azure Database for PostgreSQL.
-- Azure Blob Storage.
-- Azure App Settings or Key Vault for secrets.
+The plan covers the recommended Azure architecture, production environment variables, deployment checklist, migration guidance, and security notes.

@@ -13,6 +13,7 @@ function App() {
   const [refreshDocuments, setRefreshDocuments] = useState(0);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [message, setMessage] = useState("");
+  const [authMode, setAuthMode] = useState("login");
   const [isUserLoading, setIsUserLoading] = useState(false);
 
   useEffect(() => {
@@ -58,46 +59,81 @@ function App() {
     setCurrentUser(null);
     setSelectedDocument(null);
     setMessage("Logged out.");
+    setAuthMode("login");
+  }
+
+  function switchAuthMode(nextMode) {
+    setAuthMode(nextMode);
+    setMessage("");
   }
 
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="brand-block">
-          <span className="brand-mark">PS</span>
-          <h1>PaperSleuth</h1>
-          <p>OCR review and document extraction workspace</p>
-        </div>
-        <div className="header-actions">
-          {token && (
-            <div className="user-chip" title={currentUser?.email || "Signed in user"}>
-              {isUserLoading ? "Checking session..." : currentUser?.email}
+        <div className="nav-inner">
+          <div className="brand-block">
+            <span className="brand-mark">PS</span>
+            <div>
+              <h1>PaperSleuth</h1>
+              <p>Document intelligence workspace</p>
             </div>
-          )}
-          {token && (
-            <button className="secondary-button" type="button" onClick={handleLogout}>
-              Log out
-            </button>
-          )}
+          </div>
+          <div className="header-actions">
+            {token && (
+              <div className="user-chip" title={currentUser?.email || "Signed in user"}>
+                {isUserLoading ? "Checking session..." : currentUser?.email}
+              </div>
+            )}
+            {token && (
+              <button className="secondary-button" type="button" onClick={handleLogout}>
+                Log out
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
-      <main className="app-main">
-        <aside className="sidebar">
-          <section className="panel">
-            <div className="panel-heading">
-              <div>
-                <span className="eyebrow">Account</span>
-                <h2>{token ? "Session" : "Get started"}</h2>
-              </div>
+      <main>
+        {!token ? (
+          <section className="landing-shell">
+            <div className="auth-card">
+              {message && <p className="notice-message">{message}</p>}
+              {authMode === "login" ? (
+                <LoginForm
+                  onLogin={handleLogin}
+                  onSwitchToSignup={() => switchAuthMode("signup")}
+                />
+              ) : (
+                <SignupForm
+                  onSignup={setMessage}
+                  onSwitchToLogin={() => switchAuthMode("login")}
+                />
+              )}
             </div>
-            {message && <p className="notice-message">{message}</p>}
-            {!token ? (
-              <div className="auth-grid">
-                <SignupForm onSignup={setMessage} />
-                <LoginForm onLogin={handleLogin} />
+
+            <section className="hero-panel">
+              <span className="eyebrow">Azure-ready document intelligence</span>
+              <h2>Extract, understand, and organize documents in one place.</h2>
+              <p>
+                Upload scanned PDFs, extract text with OCR, and review structured
+                outputs securely.
+              </p>
+              <div className="feature-grid" id="features">
+                <div>OCR extraction</div>
+                <div>JSON outputs</div>
+                <div>Document history</div>
+                <div>Azure-ready storage</div>
               </div>
-            ) : (
+            </section>
+          </section>
+        ) : (
+          <section className="dashboard-shell">
+            <div className="dashboard-intro">
+              <div>
+                <span className="eyebrow">Dashboard</span>
+                <h2>Review your document pipeline</h2>
+                <p>Upload PDFs, track processing status, and inspect extracted outputs.</p>
+              </div>
               <div className="session-card">
                 <span className="status-dot" />
                 <div>
@@ -105,23 +141,13 @@ function App() {
                   <p>{currentUser?.email || "Session active"}</p>
                 </div>
               </div>
-            )}
-          </section>
+            </div>
 
-          {token && (
-            <section className="panel">
-              <DocumentUpload
-                token={token}
-                onUploaded={handleDocumentUploaded}
-              />
-            </section>
-          )}
-        </aside>
-
-        <section className="workspace-grid">
-          {token ? (
-            <>
-              <section className="panel">
+            <div className="dashboard-grid">
+              <section className="panel upload-panel">
+                <DocumentUpload token={token} onUploaded={handleDocumentUploaded} />
+              </section>
+              <section className="panel history-panel">
                 <DocumentList
                   token={token}
                   refreshKey={refreshDocuments}
@@ -129,18 +155,12 @@ function App() {
                   onSelectDocument={setSelectedDocument}
                 />
               </section>
-              <section className="panel">
+              <section className="panel detail-panel">
                 <DocumentDetail document={selectedDocument} token={token} />
               </section>
-            </>
-          ) : (
-            <section className="panel empty-workspace">
-              <span className="eyebrow">Workspace</span>
-              <h2>Upload, extract, and review documents from one place.</h2>
-              <p>Sign up or log in to start processing PDFs and building document history.</p>
-            </section>
-          )}
-        </section>
+            </div>
+          </section>
+        )}
       </main>
     </div>
   );
