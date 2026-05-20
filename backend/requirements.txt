@@ -12,3 +12,6 @@ sqlalchemy
 passlib[bcrypt]
 python-jose[cryptography]
 email-validator
+psycopg2-binary
+azure-storage-blob
+alembic

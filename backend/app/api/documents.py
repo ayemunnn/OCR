@@ -1,12 +1,13 @@
 import json
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from ..db.session import get_db
 from ..models.document import Document
+from ..models.user import User
 from ..schemas.document import DocumentListResponse, DocumentResponse
+from .auth import get_current_user
 from ..services.llm_service import analyze_document_text
 from ..services.ocr_service import extract_text_from_images
 from ..services.pdf_service import (
@@ -16,62 +17,90 @@ from ..services.pdf_service import (
     validate_pdf_filename,
 )
 from ..services.storage_service import (
+    AzureStorageConfigurationError,
+    UnsupportedStorageProviderError,
     create_document_folder,
+    read_extracted_text,
+    read_output_json,
     save_extracted_text,
-    save_original_pdf,
-    save_structured_output,
+    save_output_json,
+    save_upload,
 )
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
-def get_document_or_404(document_id: str, db: Session) -> Document:
-    document = db.query(Document).filter(Document.document_id == document_id).first()
+def get_document_or_404(document_id: str, current_user: User, db: Session) -> Document:
+    document = (
+        db.query(Document)
+        .filter(
+            Document.document_id == document_id,
+            Document.user_id == current_user.id,
+        )
+        .first()
+    )
     if not document:
         raise HTTPException(status_code=404, detail="Document not found.")
     return document
 
 
 @router.get("", response_model=DocumentListResponse)
-def list_documents(db: Session = Depends(get_db)):
-    documents = db.query(Document).order_by(Document.created_at.desc()).all()
+def list_documents(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    documents = (
+        db.query(Document)
+        .filter(Document.user_id == current_user.id)
+        .order_by(Document.created_at.desc())
+        .all()
+    )
     return {"documents": documents}
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
-def get_document(document_id: str, db: Session = Depends(get_db)):
-    return get_document_or_404(document_id, db)
+def get_document(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return get_document_or_404(document_id, current_user, db)
 
 
 @router.get("/{document_id}/text")
-def get_document_text(document_id: str, db: Session = Depends(get_db)):
-    document = get_document_or_404(document_id, db)
-    if not document.extracted_text_path:
+def get_document_text(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    document = get_document_or_404(document_id, current_user, db)
+    try:
+        text = read_extracted_text(document.extracted_text_path)
+    except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Extracted text file not found.")
-
-    text_path = Path(document.extracted_text_path)
-    if not text_path.exists():
-        raise HTTPException(status_code=404, detail="Extracted text file not found.")
+    except (AzureStorageConfigurationError, UnsupportedStorageProviderError) as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return {
         "document_id": document.document_id,
-        "filename": text_path.name,
-        "text": text_path.read_text(encoding="utf-8"),
+        "filename": "extracted_text.txt",
+        "text": text,
     }
 
 
 @router.get("/{document_id}/json")
-def get_document_json(document_id: str, db: Session = Depends(get_db)):
-    document = get_document_or_404(document_id, db)
-    if not document.output_json_path:
-        raise HTTPException(status_code=404, detail="Output JSON file not found.")
-
-    json_path = Path(document.output_json_path)
-    if not json_path.exists():
-        raise HTTPException(status_code=404, detail="Output JSON file not found.")
-
+def get_document_json(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    document = get_document_or_404(document_id, current_user, db)
     try:
-        output = json.loads(json_path.read_text(encoding="utf-8"))
+        output = read_output_json(document.output_json_path)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Output JSON file not found.")
+    except (AzureStorageConfigurationError, UnsupportedStorageProviderError) as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     except json.JSONDecodeError as exc:
         raise HTTPException(
             status_code=500,
@@ -80,7 +109,7 @@ def get_document_json(document_id: str, db: Session = Depends(get_db)):
 
     return {
         "document_id": document.document_id,
-        "filename": json_path.name,
+        "filename": "output.json",
         "output": output,
     }
 
@@ -88,6 +117,7 @@ def get_document_json(document_id: str, db: Session = Depends(get_db)):
 @router.post("/process")
 async def process_document(
     file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     temp_path = None
@@ -106,6 +136,7 @@ async def process_document(
             return
 
         document = Document(
+            user_id=current_user.id,
             document_id=document_id,
             original_filename=file.filename or "",
             storage_folder=document_folder,
@@ -135,7 +166,7 @@ async def process_document(
         document_id = document_metadata["document_id"]
         document_folder = document_metadata["folder_path"]
         saved_files.update(
-            save_original_pdf(document_folder, file.filename, file_bytes)
+            save_upload(document_folder, file.filename, file_bytes)
         )
 
         temp_path = save_temp_pdf(file_bytes)
@@ -146,11 +177,16 @@ async def process_document(
         raise
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (AzureStorageConfigurationError, UnsupportedStorageProviderError) as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     except Exception as exc:
         save_document_record("failed", str(exc))
         raise HTTPException(
             status_code=500,
-            detail=f"OCR processing failed: {exc}",
+            detail=(
+                "OCR processing failed. Check that Tesseract and Poppler are "
+                "installed and that the uploaded PDF is valid."
+            ),
         ) from exc
     finally:
         cleanup_file(temp_path)
@@ -163,7 +199,7 @@ async def process_document(
             structured_output = llm_result["structured_output"]
             llm_message = llm_result["message"]
             saved_files.update(
-                save_structured_output(document_folder, structured_output)
+                save_output_json(document_folder, structured_output)
             )
         except Exception as exc:
             llm_message = f"LLM processing failed: {exc}"
@@ -177,6 +213,7 @@ async def process_document(
         "status": llm_message,
         "document_id": document_id,
         "extracted_text_preview": extracted_text[:1000],
-        "structured_output": structured_output,
-        "saved_files": saved_files,
+        "has_extracted_text": bool(saved_path("extracted_text")),
+        "has_output_json": bool(saved_path("structured_output")),
+        "message": llm_message,
     }

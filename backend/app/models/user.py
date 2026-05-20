@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .document import Base
 
@@ -23,3 +23,5 @@ class User(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
     )
+
+    documents = relationship("Document", back_populates="user")
