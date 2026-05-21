@@ -1,7 +1,10 @@
 from functools import lru_cache
+import json
 from pathlib import Path
+from typing import Annotated
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -19,12 +22,32 @@ class Settings(BaseSettings):
     storage_provider: str = "local"
     azure_storage_connection_string: str | None = None
     azure_storage_container_name: str = "papersleuth-documents"
-    backend_cors_origins: list[str] = [
+    backend_cors_origins: Annotated[list[str], NoDecode] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
+
+    @field_validator("backend_cors_origins", mode="before")
+    @classmethod
+    def parse_backend_cors_origins(cls, value):
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return []
+
+            if value.startswith("["):
+                try:
+                    parsed = json.loads(value)
+                except json.JSONDecodeError:
+                    parsed = None
+                if isinstance(parsed, list):
+                    return [str(origin).strip() for origin in parsed if str(origin).strip()]
+
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+
+        return value
 
     model_config = SettingsConfigDict(
         env_file=("backend/.env", "../.env", ".env"),
