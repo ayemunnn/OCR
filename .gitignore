@@ -1,5 +1,8 @@
 .env
+.env.local
+.env.*.local
 backend/.env
+backend/.env.local
 __pycache__/
 *.pyc
 *.pyo
@@ -7,5 +10,11 @@ __pycache__/
 *.log
 .DS_Store
 .vscode/
+.pytest_cache/
 backend/storage/
 backend/papersleuth.db
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/node_modules/
+frontend/dist/
