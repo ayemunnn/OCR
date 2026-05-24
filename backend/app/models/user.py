@@ -13,6 +13,14 @@ class User(Base):
     email: Mapped[str] = mapped_column(String, unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String)
     full_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    auth_provider: Mapped[str] = mapped_column(String, default="email")
+    google_sub: Mapped[str | None] = mapped_column(
+        String,
+        unique=True,
+        index=True,
+        nullable=True,
+    )
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

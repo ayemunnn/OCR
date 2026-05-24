@@ -10,7 +10,8 @@ function formatDate(value) {
 }
 
 function buildJsonFilename(document) {
-  const baseName = document.original_filename
+  const filename = document.original_filename || document.filename || "";
+  const baseName = filename
     .replace(/\.pdf$/i, "")
     .replace(/[^a-z0-9-_]+/gi, "_")
     .replace(/^_+|_+$/g, "");
@@ -114,7 +115,7 @@ function DocumentDetail({ document, token }) {
       <div className="panel-heading">
         <div>
           <span className="eyebrow">Details</span>
-          <h2>{document.original_filename}</h2>
+          <h2>{document.original_filename || document.filename || "Processed document"}</h2>
         </div>
       </div>
 

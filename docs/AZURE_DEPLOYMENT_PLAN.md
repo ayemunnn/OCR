@@ -26,7 +26,7 @@ APP_NAME=PaperSleuth
 APP_ENV=production
 APP_DEBUG=false
 DATABASE_URL=postgresql+psycopg2://<username>:<password>@<host>:5432/<database_name>
-SECRET_KEY=<strong-production-secret>
+SECRET_KEY=<set-in-azure-secret-store>
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 BACKEND_CORS_ORIGINS=["https://<frontend-domain>"]
@@ -36,6 +36,10 @@ AZURE_STORAGE_CONTAINER_NAME=papersleuth-documents
 HF_API_KEY=<hugging-face-token-if-used>
 LLM_API_KEY=<generic-llm-token-if-provider-changes>
 HF_MODEL_NAME=google/gemma-3-27b-it
+GOOGLE_CLIENT_ID=<google-oauth-client-id>
+GOOGLE_CLIENT_SECRET=<set-in-azure-secret-store>
+GOOGLE_REDIRECT_URI=https://papersleuth-api.blueplant-9aa4530b.canadacentral.azurecontainerapps.io/auth/google/callback
+FRONTEND_URL=https://ashy-tree-0793b110f.7.azurestaticapps.net
 ```
 
 Notes:
@@ -44,6 +48,7 @@ Notes:
 - `SECRET_KEY` must be changed from the local default before deployment.
 - `BACKEND_CORS_ORIGINS` should include only the deployed frontend URL.
 - Use either `HF_API_KEY` for the current Hugging Face integration or a future `LLM_API_KEY` if the provider changes.
+- `GOOGLE_CLIENT_SECRET` must stay backend-only and should be stored as a secret.
 
 ### Frontend
 
@@ -69,6 +74,7 @@ VITE_API_BASE_URL=https://<backend-api-domain>
 12. Set `VITE_API_BASE_URL` to the backend API URL.
 13. Restrict backend CORS to the production frontend URL.
 14. Test signup, login, PDF upload, document history, extracted text, and JSON output.
+15. Test Google login using a verified Google account.
 
 ## Database Migrations
 

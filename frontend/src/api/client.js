@@ -31,6 +31,10 @@ export function login({ email, password }) {
   });
 }
 
+export function getGoogleLoginUrl() {
+  return `${API_BASE_URL}/auth/google/login`;
+}
+
 export function getCurrentUser(token) {
   return request("/auth/me", {
     headers: {

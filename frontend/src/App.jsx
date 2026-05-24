@@ -17,6 +17,27 @@ function App() {
   const [isUserLoading, setIsUserLoading] = useState(false);
 
   useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const params = hashParams.size > 0 ? hashParams : queryParams;
+    const accessToken = params.get("access_token");
+    const authError = queryParams.get("auth_error") || hashParams.get("auth_error");
+
+    if (accessToken) {
+      localStorage.setItem("papersleuth_token", accessToken);
+      setToken(accessToken);
+      setMessage("Logged in successfully with Google.");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (authError) {
+      setToken(null);
+      localStorage.removeItem("papersleuth_token");
+      setAuthMode("login");
+      setMessage(authError);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  useEffect(() => {
     async function loadCurrentUser() {
       if (!token) {
         setCurrentUser(null);
