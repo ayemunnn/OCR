@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { login } from "../api/client";
+import { getGoogleLoginUrl, login } from "../api/client";
 
 function LoginForm({ onLogin, onSwitchToSignup }) {
   const [email, setEmail] = useState("");
@@ -21,6 +21,10 @@ function LoginForm({ onLogin, onSwitchToSignup }) {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function handleGoogleLogin() {
+    window.location.href = getGoogleLoginUrl();
   }
 
   return (
@@ -51,6 +55,11 @@ function LoginForm({ onLogin, onSwitchToSignup }) {
         {isSubmitting ? "Logging in..." : "Log in"}
       </button>
       {message && <p className="error-message">{message}</p>}
+      <div className="auth-divider">or</div>
+      <button className="google-button" type="button" onClick={handleGoogleLogin}>
+        <span className="google-mark">G</span>
+        Continue with Google
+      </button>
       <p className="auth-switch">
         New to PaperSleuth?{" "}
         <button type="button" onClick={onSwitchToSignup}>

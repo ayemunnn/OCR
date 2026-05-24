@@ -18,6 +18,8 @@ class UserResponse(BaseModel):
     id: int
     email: EmailStr
     full_name: str | None
+    auth_provider: str
+    email_verified: bool
     is_active: bool
     created_at: datetime
     updated_at: datetime

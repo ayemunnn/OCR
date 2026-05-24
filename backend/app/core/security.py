@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import secrets
 from typing import Any
 
 from jose import JWTError, jwt
@@ -34,3 +35,21 @@ def decode_access_token(token: str) -> dict[str, Any]:
         return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
     except JWTError as exc:
         raise ValueError("Invalid or expired token.") from exc
+
+
+def create_oauth_state() -> str:
+    settings = get_settings()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=10)
+    payload = {
+        "nonce": secrets.token_urlsafe(24),
+        "purpose": "google_oauth",
+        "exp": expire,
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+
+
+def decode_oauth_state(state: str) -> dict[str, Any]:
+    payload = decode_access_token(state)
+    if payload.get("purpose") != "google_oauth":
+        raise ValueError("Invalid OAuth state.")
+    return payload

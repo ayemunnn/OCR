@@ -98,6 +98,25 @@ docker compose up --build
 
 Do not commit real API keys. If `HF_API_KEY` is blank, uploads still complete with OCR text and the response will say that LLM processing was skipped.
 
+## Optional Google Login Setup
+
+Email/password auth remains supported. To enable Google login, create an OAuth client in Google Cloud Console and add this authorized redirect URI:
+
+```text
+https://papersleuth-api.blueplant-9aa4530b.canadacentral.azurecontainerapps.io/auth/google/callback
+```
+
+Set these backend environment variables in Azure Container Apps:
+
+```text
+GOOGLE_CLIENT_ID=<set-from-google-cloud-console>
+GOOGLE_CLIENT_SECRET=<set-in-azure-secret-store>
+GOOGLE_REDIRECT_URI=https://papersleuth-api.blueplant-9aa4530b.canadacentral.azurecontainerapps.io/auth/google/callback
+FRONTEND_URL=https://ashy-tree-0793b110f.7.azurestaticapps.net
+```
+
+Do not commit Google client secrets. Google login only creates or signs in users when Google marks the email as verified.
+
 ## Docker Workflow
 
 Docker is optional. The normal Miniconda workflow remains supported.
@@ -110,7 +129,7 @@ docker compose up --build
 
 Open the frontend at `http://127.0.0.1:5173` and the backend API docs at `http://127.0.0.1:8000/docs`.
 
-The Docker backend uses PostgreSQL with local development credentials from `docker-compose.yml`. These credentials are not production secrets.
+The Docker backend uses PostgreSQL with local trust authentication for development only. Do not use this database configuration in production.
 
 Apply database migrations to the Docker PostgreSQL database:
 
