@@ -28,6 +28,7 @@ from ..services.storage_service import (
 )
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+MAX_UPLOAD_SIZE_BYTES = 1 * 1024 * 1024
 
 
 def get_document_or_404(document_id: str, current_user: User, db: Session) -> Document:
@@ -161,6 +162,12 @@ async def process_document(
         file_bytes = await file.read()
         if not file_bytes:
             raise HTTPException(status_code=400, detail="Uploaded PDF is empty.")
+
+        if len(file_bytes) > MAX_UPLOAD_SIZE_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail="Uploaded PDF is too large. Maximum allowed size is 1 MB.",
+            )
 
         document_metadata = create_document_folder()
         document_id = document_metadata["document_id"]
